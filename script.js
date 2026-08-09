@@ -176,6 +176,55 @@ function getScheduleHealth(varianceDays, counts) {
 }
 
 /* ============================================================
+   LIVE SYNC (Firebase Realtime Database)
+   Every mutation writes the whole schedule to /schedule.
+   Every client listens to /schedule and re-renders on any
+   change — including its own writes and writes from other
+   tabs/devices. Last write wins.
+   ============================================================ */
+
+let FIREBASE_READY = false;
+
+function firebaseSave() {
+  if (typeof db === "undefined") return;
+  const payload = {
+    milestones: STATE.milestones,
+    holidays: STATE.holidays,
+    activity: STATE.activity.map(a => ({ text: a.text, time: a.time.toISOString() })),
+    lastUpdated: STATE.lastUpdated.toISOString(),
+  };
+  db.ref("schedule").set(payload);
+}
+
+function firebaseListen() {
+  if (typeof db === "undefined") {
+    // Firebase not configured — fall back to local-only mode.
+    logActivity("Schedule loaded — baseline for 43 Munn, project start Aug 7, 2026.");
+    renderAll();
+    return;
+  }
+  db.ref("schedule").on("value", (snapshot) => {
+    const val = snapshot.val();
+    if (!val) {
+      // Nothing in the database yet — seed it with the baseline.
+      STATE.milestones = deepClone(BASELINE_MILESTONES);
+      STATE.holidays = deepClone(DEFAULT_HOLIDAYS);
+      STATE.activity = [];
+      STATE.lastUpdated = new Date();
+      logActivity("Schedule loaded — baseline for 43 Munn, project start Aug 7, 2026.");
+      firebaseSave();
+      return;
+    }
+    STATE.milestones = val.milestones || deepClone(BASELINE_MILESTONES);
+    STATE.holidays = val.holidays || deepClone(DEFAULT_HOLIDAYS);
+    STATE.activity = (val.activity || []).map(a => ({ text: a.text, time: new Date(a.time) }));
+    STATE.lastUpdated = val.lastUpdated ? new Date(val.lastUpdated) : new Date();
+    FIREBASE_READY = true;
+    renderAll();
+  });
+}
+
+/* ============================================================
    ACTIVITY FEED
    ============================================================ */
 
@@ -203,6 +252,8 @@ function renderAll() {
   renderActivity();
   renderHolidays();
   document.getElementById("lastUpdated").textContent = "Last updated: " + STATE.lastUpdated.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+  const syncEl = document.getElementById("syncStatus");
+  if (syncEl) syncEl.textContent = FIREBASE_READY ? "🔥 Live sync on" : "Local mode";
 }
 
 function renderHeader() {
@@ -475,6 +526,7 @@ function renderHolidays() {
         STATE.holidays = STATE.holidays.filter(x => !(x.date === h.date && x.name === h.name));
         STATE.lastUpdated = new Date();
         logActivity(`Holiday removed: ${h.name} (${h.date})`);
+        firebaseSave();
         renderAll();
       };
       row.appendChild(rm);
@@ -561,6 +613,7 @@ function saveModal() {
   }
 
   closeModal();
+  firebaseSave();
   renderAll();
 }
 
@@ -570,6 +623,7 @@ function clearManualStart() {
   m.manualStart = null;
   STATE.lastUpdated = new Date();
   logActivity(`${m.name}: start date reset to dependency-calculated date`);
+  firebaseSave();
   renderAll();
   openModal(id);
 }
@@ -680,6 +734,7 @@ function importCSVFile(file) {
       STATE.lastUpdated = new Date();
       STATE.statusFilter = "All";
       logActivity(`Schedule imported from CSV — ${newMilestones.length} milestones loaded.`);
+      firebaseSave();
       renderAll();
       alert(`Import successful: ${newMilestones.length} milestones loaded.`);
     } catch (err) {
@@ -700,6 +755,7 @@ function resetSchedule() {
   STATE.statusFilter = "All";
   STATE.lastUpdated = new Date();
   logActivity("Schedule reset to original baseline.");
+  firebaseSave();
   renderAll();
 }
 
@@ -718,6 +774,7 @@ function addHoliday() {
   nameInput.value = "";
   STATE.lastUpdated = new Date();
   logActivity(`Holiday added: ${name} (${date})`);
+  firebaseSave();
   renderAll();
 }
 
@@ -748,8 +805,7 @@ function init() {
     document.getElementById("holidayPanel").classList.toggle("show");
   };
 
-  logActivity("Schedule loaded — baseline for 43 Munn, project start Aug 7, 2026.");
-  renderAll();
+  firebaseListen();
 }
 
 document.addEventListener("DOMContentLoaded", init);

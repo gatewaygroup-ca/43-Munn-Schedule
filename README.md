@@ -9,15 +9,49 @@ as plain HTML/CSS/JS and is ready to host on GitHub Pages.
 ## Files
 
 ```
-index.html   Page structure and the milestone edit modal
-style.css    All styling (light, neutral, professional PM aesthetic)
-data.js      PROJECT info, statutory holidays, and the 30-phase baseline schedule
-script.js    Business-day engine, dependency scheduling, rendering, edit/import/export logic
-README.md    This file
+index.html          Page structure and the milestone edit modal
+style.css            All styling (light, neutral, professional PM aesthetic)
+data.js              PROJECT info, statutory holidays, and the 30-phase baseline schedule
+script.js            Business-day engine, dependency scheduling, rendering, edit/import/export logic
+firebase-config.js   Firebase project credentials + live-sync connection
+README.md            This file
 ```
 
-Upload all four of `index.html`, `style.css`, `script.js`, `data.js` (plus this
-README) to GitHub — those four are the entire application.
+Upload all five of `index.html`, `style.css`, `script.js`, `data.js`,
+`firebase-config.js` (plus this README) to GitHub — those five are the entire
+application.
+
+## Live sync (Firebase Realtime Database)
+
+This build is connected to a free Firebase Realtime Database. Any edit made in
+the app — status/progress changes, imports, resets, holiday changes — is
+written to `https://munn-schedule-default-rtdb.firebaseio.com/schedule` and
+pushed to every open copy of the site in real time. The footer shows
+**🔥 Live sync on** when connected; if `firebase-config.js` is missing or
+misconfigured it falls back to **Local mode** (edits only persist in that
+browser tab, same as before).
+
+**Security note:** the database is currently readable and writable by anyone
+with its address (no login required) — fine for an internal team tool, but
+worth tightening if this ever needs to be locked down. To restrict it later:
+
+1. In the Firebase console, go to Realtime Database → **Rules**.
+2. Replace the rules with something like:
+   ```json
+   {
+     "rules": {
+       "schedule": {
+         ".read": true,
+         ".write": true,
+         ".validate": "newData.hasChildren(['milestones', 'holidays'])"
+       }
+     }
+   }
+   ```
+   — or, for real access control, add [Firebase Authentication](https://firebase.google.com/docs/auth)
+   (e.g. email/password or Google sign-in for your team) and require
+   `auth != null` in the write rule.
+3. Click **Publish**.
 
 ---
 
