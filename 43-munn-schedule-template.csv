@@ -1,0 +1,31 @@
+ID,Milestone,Start Date,Duration (Business Days),Finish Date,Status,Progress %,Trade,Dependency,Notes
+1,Demolition,2026-08-07,5,2026-08-13,In Progress,40,General Contractor,,Remove existing structure & clear site.
+2,Excavation,2026-08-14,6,2026-08-21,Not Started,0,Excavation Contractor,1,Bulk dig to design subgrade.
+3,Foundation / Footings,2026-08-24,6,2026-08-31,Not Started,0,Concrete Contractor,2,"Footing forms, rebar, pour."
+4,Underground Services,2026-09-01,4,2026-09-04,Not Started,0,Plumbing / Utilities,3,"Under-slab plumbing, drainage, conduit."
+5,Foundation Walls / Waterproofing,2026-09-08,8,2026-09-17,Not Started,0,Concrete Contractor,4,"Foundation walls, damp-proofing, cure time."
+6,Backfill,2026-09-18,3,2026-09-22,Not Started,0,Excavation Contractor,5,Backfill & compact around foundation.
+7,Framing,2026-09-23,22,2026-10-23,Not Started,0,Framing Crew,6,"Floor, wall, and roof framing."
+8,Roofing,2026-10-26,8,2026-11-04,Not Started,0,Roofing Contractor,7,"Sheathing, underlayment, shingles."
+9,Windows & Exterior Doors,2026-10-26,5,2026-10-30,Not Started,0,Window Installer,7,Install & flash windows and exterior doors.
+10,Plumbing Rough-in,2026-11-05,7,2026-11-13,Not Started,0,Plumbing Contractor,8;9,"Supply, DWV, stack-outs."
+11,HVAC Rough-in,2026-11-05,8,2026-11-16,Not Started,0,HVAC Contractor,8;9,Ductwork & equipment sets.
+12,Electrical Rough-in,2026-11-05,7,2026-11-13,Not Started,0,Electrical Contractor,8;9,"Wiring, panel, boxes."
+13,Insulation,2026-11-17,5,2026-11-23,Not Started,0,Insulation Contractor,10;11;12,"Wall & attic insulation, air sealing."
+14,Drywall,2026-11-24,12,2026-12-09,Not Started,0,Drywall Contractor,13,Hang board throughout.
+15,Taping / Mudding,2026-12-10,7,2026-12-18,Not Started,0,Drywall Contractor,14,"Tape, mud, sand to paint-ready."
+16,Interior Doors & Trim,2026-12-21,8,2026-12-31,Not Started,0,Finish Carpenter,15,"Hang doors, install casing & baseboard."
+17,Cabinetry,2026-12-21,6,2026-12-29,Not Started,0,Cabinet Installer,15,Kitchen & bath cabinet install.
+18,Tile,2026-12-21,7,2026-12-30,Not Started,0,Tile Contractor,15,Bath & wet-area tile.
+19,Flooring,2027-01-04,8,2027-01-13,Not Started,0,Flooring Contractor,16;17;18,Subfloor prep & finish flooring.
+20,Interior Painting,2027-01-14,10,2027-01-27,Not Started,0,Painting Contractor,19,Prime & finish coats.
+21,Plumbing Finish,2027-01-28,4,2027-02-02,Not Started,0,Plumbing Contractor,20,"Fixtures, faucets, trim."
+22,Electrical Finish,2027-01-28,4,2027-02-02,Not Started,0,Electrical Contractor,20,"Devices, fixtures, panel finish."
+23,HVAC Finish,2027-01-28,3,2027-02-01,Not Started,0,HVAC Contractor,20,"Grilles, thermostats, startup."
+24,Exterior Finishes,2026-11-02,10,2026-11-13,Not Started,0,Siding / Masonry Contractor,9,"Siding, brick veneer, exterior trim."
+25,Railings,2026-11-16,4,2026-11-19,Not Started,0,Metal Fabricator,24,Interior & exterior railings.
+26,Landscaping / Site Work,2026-11-20,6,2026-11-27,Not Started,0,Landscaping Contractor,25,"Grading, sod, driveway, plantings."
+27,Deficiencies,2027-02-03,5,2027-02-09,Not Started,0,General Contractor,21;22;23;26,Punch-list corrections.
+28,Final Cleaning,2027-02-10,3,2027-02-12,Not Started,0,Cleaning Crew,27,"Construction clean, detail clean."
+29,Final Inspection,2027-02-16,2,2027-02-17,Not Started,0,Building Inspector,28,Municipal final inspection & sign-off.
+30,Project Completion,2027-02-18,1,2027-02-18,Not Started,0,General Contractor,29,Occupancy / handover.
