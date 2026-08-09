@@ -185,15 +185,48 @@ function getScheduleHealth(varianceDays, counts) {
 
 let FIREBASE_READY = false;
 
+// Firebase Realtime Database silently drops empty arrays ([]) and null
+// fields on write — they simply won't exist when read back, leaving the
+// JS object with `undefined` for that key instead of [] or null. That
+// undefined then blows up code expecting an array, and if it gets written
+// back verbatim, Firebase's .set() throws and aborts the ENTIRE save
+// (nothing else in that write goes through either). These two helpers
+// keep milestone objects well-formed on the way out and on the way in.
+function sanitizeMilestone(m) {
+  return {
+    id: m.id,
+    name: m.name,
+    duration: m.duration,
+    dependency: Array.isArray(m.dependency) ? m.dependency : [],
+    manualStart: (m.manualStart === undefined || m.manualStart === null) ? null : m.manualStart,
+    status: m.status,
+    progress: m.progress,
+    trade: m.trade || "",
+    notes: m.notes || "",
+  };
+}
+function rehydrateMilestone(m) {
+  return {
+    ...m,
+    dependency: Array.isArray(m.dependency) ? m.dependency : [],
+    manualStart: m.manualStart === undefined ? null : m.manualStart,
+    trade: m.trade || "",
+    notes: m.notes || "",
+  };
+}
+
 function firebaseSave() {
   if (typeof db === "undefined") return;
   const payload = {
-    milestones: STATE.milestones,
+    milestones: STATE.milestones.map(sanitizeMilestone),
     holidays: STATE.holidays,
     activity: STATE.activity.map(a => ({ text: a.text, time: a.time.toISOString() })),
     lastUpdated: STATE.lastUpdated.toISOString(),
   };
-  db.ref("schedule").set(payload);
+  db.ref("schedule").set(payload).catch((err) => {
+    console.error("Firebase save failed:", err);
+    alert("Couldn't sync to the live database: " + err.message + "\n\nYour change is only visible in this browser until this is fixed.");
+  });
 }
 
 function firebaseListen() {
@@ -215,12 +248,14 @@ function firebaseListen() {
       firebaseSave();
       return;
     }
-    STATE.milestones = val.milestones || deepClone(BASELINE_MILESTONES);
+    STATE.milestones = (val.milestones || deepClone(BASELINE_MILESTONES)).map(rehydrateMilestone);
     STATE.holidays = val.holidays || deepClone(DEFAULT_HOLIDAYS);
     STATE.activity = (val.activity || []).map(a => ({ text: a.text, time: new Date(a.time) }));
     STATE.lastUpdated = val.lastUpdated ? new Date(val.lastUpdated) : new Date();
     FIREBASE_READY = true;
     renderAll();
+  }, (err) => {
+    console.error("Firebase listen failed:", err);
   });
 }
 
@@ -554,7 +589,7 @@ function openModal(id) {
   document.getElementById("mProgressLabel").textContent = m.progress + "%";
   document.getElementById("mTrade").value = m.trade;
   document.getElementById("mNotes").value = m.notes;
-  document.getElementById("mDependency").textContent = (m.dependency.length
+  document.getElementById("mDependency").textContent = ((m.dependency || []).length
     ? m.dependency.map(id2 => STATE.milestones.find(x => x.id === id2)?.name).filter(Boolean).join(", ")
     : "None — starts at project start");
   document.getElementById("mError").textContent = "";
