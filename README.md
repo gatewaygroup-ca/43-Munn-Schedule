@@ -204,7 +204,104 @@ In all three options, the milestone shape stays identical to the CSV columns
 above, so `computeSchedule()` and every rendering function keep working
 unchanged — only *where the data comes from* changes.
 
-## 7. Which files to upload to GitHub
+## 8. Trade financials — how the data is structured
+
+Every milestone doubles as a **trade**. Each one carries, in addition to the
+schedule fields:
+
+```js
+{
+  contractPrice: 25000,          // original quoted/contract price
+  changeOrders: [
+    { id, description, date, amount, approvedBy, status, notes }
+    // status: "Pending" | "Approved" | "Rejected" — only Approved counts
+  ],
+  invoices: [
+    { id, invoiceNumber, vendor, invoiceDate, dueDate, subtotal, hst, total,
+      paymentStatus, paymentDate, fileName, notes }
+    // paymentStatus: "Paid" | "Pending" (shown as "Overdue" automatically
+    // once dueDate has passed and it's still unpaid — that's computed live,
+    // never stored)
+  ],
+  paymentDetails: {
+    vendorName, poNumber, paymentTerms, paymentMethod,
+    bankName, accountName, accountLast4, paymentReference, notes
+    // bankName/accountName are masked (password-style inputs) in the app
+    // until "Reveal" is clicked
+  }
+}
+```
+
+Everything else — revised contract value, total invoiced, total paid,
+balance remaining, and the trade's overall payment status — is **calculated
+live** from those three lists every time the page renders (see
+`revisedContractValue()`, `totalInvoiced()`, `totalPaid()`,
+`balanceRemaining()`, `tradePaymentStatus()` in `script.js`). Nothing
+financial is ever pre-computed and stored, so editing a change order or
+invoice always immediately updates every dashboard number, the Trade Costs
+table, and the trade's own summary.
+
+**Invoice PDFs are a prototype feature, not persisted.** When you attach a
+PDF to an invoice, the app keeps it in the browser's memory for that session
+only (via `URL.createObjectURL`) so you can preview/download it right away —
+it is **not** uploaded anywhere and does **not** sync through Firebase (PDF
+files are far too large for a realtime database, and the project brief is
+explicit that GitHub/Firebase should never become the permanent home for
+financial documents). Only the invoice's *metadata* (number, vendor, dates,
+amounts, status, and the filename as a label) syncs live like everything
+else. Reopen the site in a new tab or on another device and you'll see the
+invoice listed, but "View"/"Download" will explain the PDF itself isn't
+available there — that's expected until real file storage is wired in.
+
+## 9. Connecting real Excel and document storage later
+
+The target structure, matching what a full Excel workbook or database for
+this project would look like:
+
+| Sheet | Columns |
+|---|---|
+| **PROJECT** | Project ID, Address, Start Date, Target Completion |
+| **MILESTONES** | ID, Milestone, Start Date, Duration, Finish Date, Status, Progress %, Trade, Dependency, Notes |
+| **TRADES** | Trade ID, Project ID, Trade, Vendor, Scope, Original Contract, Approved Change Orders, Revised Contract, Total Invoiced, Total Paid, Outstanding, Payment Status, PO Number, Payment Terms, Notes |
+| **PAYMENTS** | Payment ID, Trade ID, Invoice ID, Payment Date, Amount, Payment Method, Payment Reference, Status, Notes |
+| **INVOICES** | Invoice ID, Trade ID, Vendor, Invoice Number, Invoice Date, Due Date, Subtotal, HST, Total, Payment Status, Payment Date, File Name, File URL/Reference, Notes |
+| **CHANGE ORDERS** | Change Order ID, Trade ID, Description, Date, Amount, Status, Approved By, Notes |
+| **HOLIDAYS** | Date, Name |
+
+Today, **Export Trade Financials** in the toolbar gives you the TRADES sheet
+as a CSV (contract values, invoiced/paid/outstanding, and payment status per
+trade, computed live). The MILESTONES sheet is covered by the existing
+**Export Schedule** button. Full PAYMENTS/INVOICES/CHANGE ORDERS sheets
+aren't separately exportable yet — they live nested inside each trade record
+in `data.js`/Firebase — but the shape above is what to target when building
+a real integration.
+
+For invoice PDFs specifically, the recommended path is:
+
+```
+Invoice PDF uploaded in the app
+        ↓
+Instead of staying in browser memory, upload to OneDrive/SharePoint,
+Google Drive, or Supabase Storage (whichever your team already uses)
+        ↓
+Store the returned file URL in the invoice's `fileName`/file-reference field
+        ↓
+"View" and "Download" open that real URL instead of a session-only blob
+```
+
+That's a backend change (a small upload endpoint or a Supabase Storage
+bucket), not a rewrite of the app — the invoice list, financial totals, and
+Trade Costs table all already work off whatever's in each invoice's fields,
+so once file uploads point at real storage instead of `URL.createObjectURL`,
+everything else keeps working unchanged.
+
+**Security reminder:** because this now includes contract values and
+banking-adjacent fields, the "database open to anyone with the link" setup
+from earlier matters more here. If you haven't already tightened the
+Firebase rules or added authentication, this is the point to prioritize it —
+see the Live Sync section above.
+
+## 10. Which files to upload to GitHub
 
 Minimum required for the site to work on GitHub Pages:
 

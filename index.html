@@ -22,6 +22,7 @@
       <button class="btn" id="btnToggleHolidays">Holidays</button>
       <button class="btn" id="btnImport">Import Excel / CSV</button>
       <button class="btn" id="btnExport">Export Schedule</button>
+      <button class="btn" id="btnExportFinancials">Export Trade Financials</button>
       <button class="btn danger" id="btnReset">Reset to Original Schedule</button>
       <input type="file" id="csvFileInput" accept=".csv" style="display:none">
     </div>
@@ -56,6 +57,24 @@
       <div class="metric-label">Schedule Status</div>
       <div class="metric-value badge-text" id="metricStatus">—</div>
       <div class="metric-note" id="varianceNote"></div>
+    </div>
+  </div>
+
+  <!-- ===== Trade Financial Summary ===== -->
+  <div class="metrics fin-metrics" id="finSummaryMetrics"></div>
+
+  <!-- ===== Trade Costs table ===== -->
+  <div class="card" style="margin-bottom:14px;">
+    <h2>Trade Costs</h2>
+    <div class="trade-table-wrap">
+      <table class="trade-table" id="tradeCostTable">
+        <thead>
+          <tr>
+            <th>Trade</th><th>Contractor</th><th>Contract Value</th><th>Invoiced</th><th>Paid</th><th>Outstanding</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="tradeCostTableBody"></tbody>
+      </table>
     </div>
   </div>
 
@@ -115,7 +134,11 @@
       <h3 id="modalTitle">Milestone</h3>
       <button class="icon-btn" id="btnCloseModal" style="font-size:22px;">×</button>
     </div>
-    <div class="modal-body">
+    <div class="modal-tabs">
+      <button class="modal-tab active" id="tabBtnSchedule">Schedule</button>
+      <button class="modal-tab" id="tabBtnFinancials">💰 Financials</button>
+    </div>
+    <div class="modal-body" id="scheduleTabContent">
       <div class="field">
         <label>Dependencies</label>
         <div class="dep-static" id="mDependency"></div>
@@ -164,7 +187,8 @@
       </div>
       <div class="modal-error" id="mError"></div>
     </div>
-    <div class="modal-foot">
+    <div class="modal-body" id="financialsTabContent" style="display:none;"></div>
+    <div class="modal-foot" id="scheduleModalFoot">
       <button class="btn" id="btnCancelModal">Cancel</button>
       <button class="btn primary" id="btnSaveModal">Save Changes</button>
     </div>

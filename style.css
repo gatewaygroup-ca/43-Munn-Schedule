@@ -219,6 +219,73 @@ html, body {
 }
 .holiday-add input[type="text"] { flex: 1; min-width: 140px; }
 
+/* ---------- Modal tabs ---------- */
+.modal-tabs { display: flex; gap: 4px; padding: 12px 20px 0; border-bottom: 1px solid var(--border); }
+.modal-tab {
+  font-family: inherit; font-size: 12.5px; font-weight: 700; background: none; border: none;
+  padding: 8px 12px 10px; color: var(--text-faint); cursor: pointer; border-bottom: 2px solid transparent;
+}
+.modal-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ---------- Trade financial summary ---------- */
+.fin-metrics { grid-template-columns: repeat(5, 1fr); }
+.fin-metrics .metric-value { font-size: 20px; }
+
+/* ---------- Trade cost table ---------- */
+.trade-table-wrap { overflow-x: auto; }
+.trade-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.trade-table th {
+  text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-faint); padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.trade-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.trade-table tr.clickable { cursor: pointer; }
+.trade-table tr.clickable:hover { background: var(--gray-soft); }
+.trade-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------- Financials tab ---------- */
+.fin-section { margin-bottom: 20px; }
+.fin-section:last-child { margin-bottom: 0; }
+.fin-section-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-faint); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+}
+.fin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.fin-stat { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
+.fin-stat-label { font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .04em; }
+.fin-stat-val { font-size: 16px; font-weight: 700; margin-top: 2px; }
+.fin-list-item {
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 8px;
+  font-size: 12.5px; display: flex; flex-direction: column; gap: 4px;
+}
+.fin-list-item-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.fin-list-item-meta { color: var(--text-dim); font-size: 11.5px; }
+.fin-list-actions { display: flex; gap: 10px; margin-top: 4px; }
+.fin-list-actions button { background: none; border: none; color: var(--accent); font-size: 11.5px; font-weight: 600; cursor: pointer; padding: 0; }
+.fin-list-actions button.danger { color: var(--red); }
+.fin-add-form { border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 12px; margin-top: 6px; }
+.fin-add-form .field-row { margin-bottom: 8px; }
+.fin-add-form .field { margin-bottom: 8px; }
+.fin-dropzone {
+  border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 16px; text-align: center;
+  font-size: 12px; color: var(--text-dim); margin-bottom: 8px; cursor: pointer; transition: all .12s ease;
+}
+.fin-dropzone.drag-over { border-color: var(--accent); background: var(--accent-soft); }
+.fin-masked { font-family: 'IBM Plex Mono', monospace; letter-spacing: .05em; }
+.fin-reveal-btn { background: none; border: none; color: var(--accent); font-size: 11px; font-weight: 600; cursor: pointer; margin-left: 8px; }
+.fin-note {
+  font-size: 11px; color: var(--text-faint); background: var(--gray-soft); border-radius: var(--radius-sm);
+  padding: 8px 10px; margin-top: 4px; line-height: 1.5;
+}
+.status-pill { font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; color: #fff; white-space: nowrap; }
+.status-pill.st-paid { background: var(--green); }
+.status-pill.st-partial { background: var(--amber); }
+.status-pill.st-unpaid { background: var(--gray); }
+.status-pill.st-overdue { background: var(--red); }
+.status-pill.st-pending { background: var(--blue); }
+.status-pill.st-approved { background: var(--green); }
+.status-pill.st-rejected { background: var(--red); }
+
 footer.appfooter {
   margin-top: 18px; font-size: 11.5px; color: var(--text-faint);
   display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px;
@@ -260,6 +327,7 @@ footer.appfooter {
 @media (max-width: 960px) {
   .grid2 { grid-template-columns: 1fr; }
   .metrics { grid-template-columns: 1fr 1fr; }
+  .fin-metrics { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 768px) {
@@ -268,10 +336,12 @@ footer.appfooter {
   .upcoming-row { grid-template-columns: 1fr auto; row-gap: 4px; }
   .upcoming-dur, .upcoming-trade { display: none; }
   .metrics { grid-template-columns: 1fr 1fr; }
+  .fin-metrics { grid-template-columns: 1fr 1fr; }
   .brand-title { font-size: 22px; }
 }
 
 @media (max-width: 480px) {
   .metrics { grid-template-columns: 1fr; }
   .field-row { grid-template-columns: 1fr; }
+  .fin-grid { grid-template-columns: 1fr; }
 }

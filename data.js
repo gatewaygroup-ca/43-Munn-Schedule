@@ -71,3 +71,33 @@ const BASELINE_MILESTONES = [
   { id: 29, name: "Final Inspection",                   duration: 2,  dependency: [28],       manualStart: null, status: "Not Started", progress: 0,  trade: "Building Inspector",         notes: "Municipal final inspection & sign-off." },
   { id: 30, name: "Project Completion",                 duration: 1,  dependency: [29],       manualStart: null, status: "Not Started", progress: 0,  trade: "General Contractor",         notes: "Occupancy / handover." },
 ];
+
+/*
+  Financial fields, added to every trade/milestone:
+    contractPrice      number — original quoted/contract price
+    changeOrders        [{ id, description, date, amount, approvedBy, status, notes }]
+                         status: "Pending" | "Approved" | "Rejected"
+                         only "Approved" orders count toward the revised contract value
+    invoices             [{ id, invoiceNumber, vendor, invoiceDate, dueDate, subtotal, hst, total,
+                            paymentStatus, paymentDate, fileName, notes }]
+                         paymentStatus: "Paid" | "Pending" | "Overdue"
+    paymentDetails       { vendorName, poNumber, paymentTerms, paymentMethod, bankName, accountName,
+                            accountLast4, paymentReference, notes }
+  All default to empty/zero — real figures are entered per-trade via the app's Financials tab.
+*/
+BASELINE_MILESTONES.forEach((m) => {
+  m.contractPrice = 0;
+  m.changeOrders = [];
+  m.invoices = [];
+  m.paymentDetails = {
+    vendorName: m.trade,
+    poNumber: "",
+    paymentTerms: "",
+    paymentMethod: "",
+    bankName: "",
+    accountName: "",
+    accountLast4: "",
+    paymentReference: "",
+    notes: "",
+  };
+});
