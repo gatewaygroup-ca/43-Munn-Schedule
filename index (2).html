@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>43 Munn — Project Schedule</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== Top bar ===== -->
+  <div class="topbar">
+    <div>
+      <div class="brand-eyebrow" id="projType">Residential Construction</div>
+      <div class="brand-title" id="projAddress">43 MUNN</div>
+      <div class="brand-sub">Project milestone schedule &amp; live tracker</div>
+    </div>
+    <div class="toolbar">
+      <button class="btn" id="btnToggleHolidays">Holidays</button>
+      <button class="btn" id="btnImport">Import Excel / CSV</button>
+      <button class="btn" id="btnExport">Export Schedule</button>
+      <button class="btn" id="btnExportFinancials">Export Trade Financials</button>
+      <button class="btn danger" id="btnReset">Reset to Original Schedule</button>
+      <input type="file" id="csvFileInput" accept=".csv" style="display:none">
+    </div>
+  </div>
+
+  <!-- Holidays panel (toggle) -->
+  <div class="card holiday-panel" id="holidayPanel" style="margin-bottom:14px;">
+    <h2>Statutory Holidays (excluded from business-day calculations)</h2>
+    <div id="holidayList"></div>
+    <div class="holiday-add">
+      <input type="date" id="newHolidayDate">
+      <input type="text" id="newHolidayName" placeholder="Holiday name">
+      <button class="btn primary" id="btnAddHoliday">Add Holiday</button>
+    </div>
+  </div>
+
+  <!-- ===== Dashboard metrics ===== -->
+  <div class="metrics">
+    <div class="metric-card">
+      <div class="metric-label">Project Progress</div>
+      <div class="metric-value" id="metricProgress">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Days Remaining</div>
+      <div class="metric-value" id="metricDaysRemaining">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Projected Completion</div>
+      <div class="metric-value" id="metricProjected">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Schedule Status</div>
+      <div class="metric-value badge-text" id="metricStatus">—</div>
+      <div class="metric-note" id="varianceNote"></div>
+    </div>
+  </div>
+
+  <!-- ===== Trade Financial Summary ===== -->
+  <div class="metrics fin-metrics" id="finSummaryMetrics"></div>
+
+  <!-- ===== Trade Costs table ===== -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="trade-header">
+      <h2 style="margin:0;">Trade Costs</h2>
+      <button class="btn primary" id="btnAddTrade">+ Add Trade</button>
+    </div>
+    <div class="chips" id="tradeFilterTabs" style="margin-top:10px;"></div>
+    <div class="trade-table-wrap">
+      <table class="trade-table" id="tradeCostTable">
+        <thead>
+          <tr>
+            <th>Trade</th><th>Vendor</th><th>Scope</th><th>Milestone</th><th>Contract Value</th>
+            <th>Invoiced</th><th>Paid</th><th>Outstanding</th><th>Invoices</th><th>Status</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tradeCostTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== Gantt timeline ===== -->
+  <div class="card gantt-card">
+    <h2>Interactive Timeline</h2>
+    <div class="chips" id="statusFilters" style="padding:0 20px;"></div>
+    <div class="gantt-scroll">
+      <div class="gantt-wrap" id="ganttWrap">
+        <div class="gantt-months" id="ganttMonths"></div>
+        <div id="ganttBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile simplified list (shown <768px instead of Gantt) -->
+  <div class="mobile-list" id="mobileList"></div>
+
+  <!-- ===== Summary / Health / Upcoming / Activity ===== -->
+  <div class="grid2">
+    <div>
+      <div class="card" style="margin-bottom:14px;">
+        <h2>Upcoming Milestones</h2>
+        <div id="upcomingList"></div>
+      </div>
+      <div class="card">
+        <h2>Recent Activity</h2>
+        <div id="activityList"></div>
+        <div class="activity-pager" id="activityPager" style="display:none;">
+          <button class="btn" id="btnActivityPrev">Previous</button>
+          <span id="activityPageLabel"></span>
+          <button class="btn" id="btnActivityNext">Next</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px;">
+        <h2>Schedule Health</h2>
+        <div class="health-row">
+          <span class="health-icon" id="healthIcon">🟢</span>
+          <span class="health-label" id="healthLabel">ON TRACK</span>
+        </div>
+        <div class="health-explain" id="healthExplain"></div>
+      </div>
+      <div class="card">
+        <h2>Project Summary</h2>
+        <div id="summaryGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="appfooter">
+    <span>43 Munn — Project Milestone Schedule &nbsp;·&nbsp; <span id="syncStatus">Connecting…</span></span>
+    <span id="lastUpdated"></span>
+  </footer>
+</div>
+
+<!-- ===== Milestone detail / edit modal ===== -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalTitle">Milestone</h3>
+      <button class="icon-btn" id="btnCloseModal" style="font-size:22px;">×</button>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" id="tabBtnSchedule">Schedule</button>
+      <button class="modal-tab" id="tabBtnFinancials">💰 Trades</button>
+    </div>
+    <div class="modal-body" id="scheduleTabContent">
+      <div class="field">
+        <label>Dependencies</label>
+        <div class="dep-static" id="mDependency"></div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Start Date</label>
+          <input type="date" id="mStart">
+        </div>
+        <div class="field">
+          <label>Finish Date (calculated)</label>
+          <div class="dep-static" id="mFinishDisplay"></div>
+        </div>
+      </div>
+      <button class="link-btn" id="btnClearManualStart">Reset start to dependency-calculated date</button>
+      <div class="field-row">
+        <div class="field">
+          <label>Duration (business days)</label>
+          <input type="number" id="mDuration" min="1">
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="mStatus">
+            <option>Not Started</option>
+            <option>In Progress</option>
+            <option>Complete</option>
+            <option>Delayed</option>
+            <option>On Hold</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Progress</label>
+        <div class="range-row">
+          <input type="range" id="mProgress" min="0" max="100" step="5">
+          <span id="mProgressLabel">0%</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Assigned Trade</label>
+        <input type="text" id="mTrade">
+      </div>
+      <div class="field">
+        <label>Notes</label>
+        <textarea id="mNotes"></textarea>
+      </div>
+      <div class="modal-error" id="mError"></div>
+    </div>
+    <div class="modal-body" id="financialsTabContent" style="display:none;"></div>
+    <div class="modal-foot" id="scheduleModalFoot">
+      <button class="btn" id="btnCancelModal">Cancel</button>
+      <button class="btn primary" id="btnSaveModal">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Trade detail / add / edit modal ===== -->
+<div class="modal-overlay" id="tradeModalOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="tradeModalTitle">Add Trade</h3>
+      <button class="icon-btn" id="btnCloseTradeModal" style="font-size:22px;">×</button>
+    </div>
+    <div class="modal-body" id="tradeModalBody"></div>
+    <div class="modal-foot">
+      <button class="btn" id="btnCancelTradeModal">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Archive / Delete trade confirmation modal ===== -->
+<div class="modal-overlay" id="removeTradeOverlay">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head">
+      <h3>Remove Trade</h3>
+    </div>
+    <div class="modal-body" id="removeTradeBody"></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="data.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
