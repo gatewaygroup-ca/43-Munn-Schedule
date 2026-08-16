@@ -307,13 +307,19 @@ function sanitizeTradePayment(p) {
     notes: p.notes || "",
   };
 }
+function normalizeMilestoneIds(t) {
+  if (Array.isArray(t.milestoneIds)) return t.milestoneIds.filter(id => id !== null && id !== undefined);
+  if (t.milestoneId !== undefined && t.milestoneId !== null) return [t.milestoneId]; // legacy single-link migration
+  return [];
+}
+
 function sanitizeTrade(t) {
   return {
     tradeId: t.tradeId,
     tradeName: t.tradeName || "",
     vendor: t.vendor || "",
     scope: t.scope || "",
-    milestoneId: (t.milestoneId === undefined || t.milestoneId === null) ? null : t.milestoneId,
+    milestoneIds: normalizeMilestoneIds(t),
     contractAmount: Number(t.contractAmount) || 0,
     hst: Number(t.hst) || 0,
     workStatus: t.workStatus || "Not Started",
@@ -329,9 +335,11 @@ function sanitizeTrade(t) {
   };
 }
 function rehydrateTrade(t) {
+  const rest = { ...t };
+  delete rest.milestoneId; // fully replaced by milestoneIds
   return {
-    ...t,
-    milestoneId: (t.milestoneId === undefined) ? null : t.milestoneId,
+    ...rest,
+    milestoneIds: normalizeMilestoneIds(t),
     vendor: t.vendor || "",
     scope: t.scope || "",
     paymentTerms: t.paymentTerms || "",
@@ -357,6 +365,77 @@ function firebaseSave() {
     console.error("Firebase save failed:", err);
     alert("Couldn't sync to the live database: " + err.message + "\n\nYour change is only visible in this browser until this is fixed.");
   });
+}
+
+// One-time content migration: the schedule originally had a single combined
+// "Foundation / Footings" milestone. This splits it into two separate
+// milestones ("Footing" under AT McLaren, "Foundation" under Total
+// Excavation) and makes sure those two trades exist and are linked
+// correctly — without touching any financial data already entered against
+// an existing trade of the same name. Idempotent: safe to call on every
+// load, it only acts once (checks whether "Footing" already exists).
+function migrateFootingFoundationSplit() {
+  const combined = STATE.milestones.find(m => m.name === "Foundation / Footings");
+  const alreadyMigrated = STATE.milestones.some(m => m.name === "Footing");
+  if (!combined || alreadyMigrated) return false;
+
+  const footingId = combined.id;
+  const excavation = STATE.milestones.find(m => m.name === "Excavation");
+  const newFoundationId = Math.max(...STATE.milestones.map(m => m.id)) + 1;
+
+  // Repoint anything that depended on the old combined milestone to the new Foundation
+  STATE.milestones.forEach(m => {
+    if (m.id === footingId) return;
+    m.dependency = (m.dependency || []).map(d => (d === footingId ? newFoundationId : d));
+  });
+
+  combined.name = "Footing";
+  combined.trade = "AT McLaren";
+  combined.duration = 3;
+  combined.notes = "Footing forms, rebar, pour.";
+
+  const foundation = {
+    id: newFoundationId, name: "Foundation", duration: 3, dependency: [footingId], manualStart: null,
+    status: "Not Started", progress: 0, trade: "Total Excavation",
+    notes: "Foundation walls & slab per Total Excavation scope.",
+    contractPrice: 0, changeOrders: [], invoices: [],
+    paymentDetails: { vendorName: "Total Excavation", poNumber: "", paymentTerms: "", paymentMethod: "", bankName: "", accountName: "", accountLast4: "", paymentReference: "", notes: "" },
+  };
+  STATE.milestones.push(foundation);
+
+  let atMcLaren = STATE.trades.find(t => t.tradeName === "AT McLaren");
+  if (!atMcLaren) {
+    atMcLaren = {
+      tradeId: nextTradeId(), tradeName: "AT McLaren", vendor: "AT McLaren", scope: "Footing",
+      milestoneIds: [footingId], contractAmount: 0, hst: 0, workStatus: "Not Started",
+      paymentTerms: "", poNumber: "", notes: "", active: true,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      changeOrders: [], invoices: [], payments: [],
+    };
+    STATE.trades.push(atMcLaren);
+  } else if (!atMcLaren.milestoneIds.includes(footingId)) {
+    atMcLaren.milestoneIds.push(footingId);
+  }
+
+  let totalExc = STATE.trades.find(t => t.tradeName === "Total Excavation");
+  if (!totalExc) {
+    totalExc = {
+      tradeId: nextTradeId(), tradeName: "Total Excavation", vendor: "Total Excavation", scope: "Excavation & Foundation",
+      milestoneIds: [excavation ? excavation.id : null, newFoundationId].filter(x => x !== null),
+      contractAmount: 0, hst: 0, workStatus: "Not Started",
+      paymentTerms: "", poNumber: "", notes: "", active: true,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      changeOrders: [], invoices: [], payments: [],
+    };
+    STATE.trades.push(totalExc);
+  } else {
+    if (excavation && !totalExc.milestoneIds.includes(excavation.id)) totalExc.milestoneIds.push(excavation.id);
+    if (!totalExc.milestoneIds.includes(newFoundationId)) totalExc.milestoneIds.push(newFoundationId);
+  }
+
+  STATE.lastUpdated = new Date();
+  logActivity('Schedule updated: "Foundation / Footings" split into separate Footing (AT McLaren) and Foundation (Total Excavation) milestones.');
+  return true;
 }
 
 function firebaseListen() {
@@ -385,6 +464,8 @@ function firebaseListen() {
     STATE.activity = (val.activity || []).map(a => ({ text: a.text, time: new Date(a.time) }));
     STATE.lastUpdated = val.lastUpdated ? new Date(val.lastUpdated) : new Date();
     FIREBASE_READY = true;
+    const migrated = migrateFootingFoundationSplit();
+    if (migrated) firebaseSave();
     renderAll();
   }, (err) => {
     console.error("Firebase listen failed:", err);
@@ -468,7 +549,7 @@ function financialTotals() {
 }
 
 function tradesForMilestone(milestoneId) {
-  return STATE.trades.filter(t => t.milestoneId === milestoneId);
+  return STATE.trades.filter(t => (t.milestoneIds || []).includes(milestoneId));
 }
 
 function nextTradeId() {
@@ -878,6 +959,11 @@ function milestoneName(id) {
   return m ? m.name : "—";
 }
 
+function milestoneNamesList(ids) {
+  if (!ids || !ids.length) return "—";
+  return ids.map(id => milestoneName(id)).join(", ");
+}
+
 function renderTradeCostTable() {
   const body = document.getElementById("tradeCostTableBody");
   if (!body) return;
@@ -899,7 +985,7 @@ function renderTradeCostTable() {
       <td>${escapeHtml(t.tradeName)}</td>
       <td>${escapeHtml(t.vendor) || "—"}</td>
       <td>${escapeHtml(t.scope) || "—"}</td>
-      <td>${escapeHtml(milestoneName(t.milestoneId)) || "—"}</td>
+      <td>${escapeHtml(milestoneNamesList(t.milestoneIds))}</td>
       <td class="num">${fmtMoney(revisedContractValue(t))}</td>
       <td class="num">${fmtMoney(invoiced)}</td>
       <td class="num">${fmtMoney(paid)}</td>
@@ -1102,12 +1188,14 @@ function getOpenTrade() {
   return STATE.trades.find(t => t.tradeId === STATE.openTradeId) || null;
 }
 
-function milestoneOptionsHtml(selectedId) {
-  let opts = `<option value="">— No milestone —</option>`;
-  STATE.milestones.forEach(m => {
-    opts += `<option value="${m.id}" ${selectedId === m.id ? "selected" : ""}>${escapeHtml(m.name)}</option>`;
-  });
-  return opts;
+function milestoneCheckboxesHtml(selectedIds) {
+  const sel = selectedIds || [];
+  return STATE.milestones.map(m => `
+    <label class="checkbox-row">
+      <input type="checkbox" class="tMilestoneCheck" value="${m.id}" ${sel.includes(m.id) ? "checked" : ""}>
+      <span>${escapeHtml(m.name)}</span>
+    </label>
+  `).join("");
 }
 
 function renderTradeModal(presetMilestoneId) {
@@ -1199,7 +1287,10 @@ function renderTradeModal(presetMilestoneId) {
         <div class="field"><label>Vendor / Contractor</label><input type="text" id="tVendor" value="${t ? escapeHtml(t.vendor) : ""}"></div>
         <div class="field"><label>Scope of Work</label><input type="text" id="tScope" value="${t ? escapeHtml(t.scope) : ""}"></div>
       </div>
-      <div class="field"><label>Milestone</label><select id="tMilestone">${milestoneOptionsHtml(t ? t.milestoneId : (presetMilestoneId ?? null))}</select></div>
+      <div class="field">
+        <label>Milestones (a trade can link to more than one)</label>
+        <div class="checkbox-list">${milestoneCheckboxesHtml(t ? t.milestoneIds : (presetMilestoneId !== undefined && presetMilestoneId !== null ? [presetMilestoneId] : []))}</div>
+      </div>
       <div class="field-row">
         <div class="field"><label>Contract Amount</label><input type="number" id="tContract" min="0" step="1" value="${t ? t.contractAmount : ""}"></div>
         <div class="field"><label>HST</label><input type="number" id="tHst" min="0" step="1" value="${t ? t.hst : ""}"></div>
@@ -1409,8 +1500,7 @@ function saveTradeModal() {
 
   const vendor = document.getElementById("tVendor").value.trim();
   const scope = document.getElementById("tScope").value.trim();
-  const milestoneIdRaw = document.getElementById("tMilestone").value;
-  const milestoneId = milestoneIdRaw ? Number(milestoneIdRaw) : null;
+  const milestoneIds = Array.from(document.querySelectorAll(".tMilestoneCheck:checked")).map(cb => Number(cb.value));
   const contractAmount = Number(document.getElementById("tContract").value) || 0;
   const hst = Number(document.getElementById("tHst").value) || 0;
   const paymentTerms = document.getElementById("tTerms").value.trim();
@@ -1423,7 +1513,7 @@ function saveTradeModal() {
 
   if (!t) {
     t = {
-      tradeId: nextTradeId(), tradeName, vendor, scope, milestoneId,
+      tradeId: nextTradeId(), tradeName, vendor, scope, milestoneIds,
       contractAmount, hst, workStatus, paymentTerms, poNumber, notes,
       active: true, createdAt: now, updatedAt: now,
       changeOrders: [], invoices: [], payments: [],
@@ -1434,7 +1524,7 @@ function saveTradeModal() {
   } else {
     const nameChanged = t.tradeName !== tradeName;
     const oldName = t.tradeName;
-    t.tradeName = tradeName; t.vendor = vendor; t.scope = scope; t.milestoneId = milestoneId;
+    t.tradeName = tradeName; t.vendor = vendor; t.scope = scope; t.milestoneIds = milestoneIds;
     t.contractAmount = contractAmount; t.hst = hst; t.paymentTerms = paymentTerms;
     t.poNumber = poNumber; t.workStatus = workStatus; t.notes = notes;
     t.updatedAt = now;
@@ -1766,7 +1856,7 @@ function exportTradeFinancialsCSV() {
   const rows = [header];
   STATE.trades.forEach(t => {
     rows.push([
-      t.tradeId, t.tradeName, t.vendor, t.scope, milestoneName(t.milestoneId),
+      t.tradeId, t.tradeName, t.vendor, t.scope, milestoneNamesList(t.milestoneIds),
       t.contractAmount || 0, t.hst || 0,
       approvedChangeOrderTotal(t),
       revisedContractValue(t),

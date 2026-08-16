@@ -42,8 +42,9 @@ const DEFAULT_HOLIDAYS = [
 const BASELINE_MILESTONES = [
   { id: 1,  name: "Demolition",                       duration: 5,  dependency: [],         manualStart: null, status: "In Progress", progress: 40, trade: "General Contractor",        notes: "Remove existing structure & clear site." },
   { id: 2,  name: "Excavation",                       duration: 6,  dependency: [1],        manualStart: null, status: "Not Started", progress: 0,  trade: "Excavation Contractor",      notes: "Bulk dig to design subgrade." },
-  { id: 3,  name: "Foundation / Footings",             duration: 6,  dependency: [2],        manualStart: null, status: "Not Started", progress: 0,  trade: "Concrete Contractor",        notes: "Footing forms, rebar, pour." },
-  { id: 4,  name: "Underground Services",              duration: 4,  dependency: [3],        manualStart: null, status: "Not Started", progress: 0,  trade: "Plumbing / Utilities",       notes: "Under-slab plumbing, drainage, conduit." },
+  { id: 3,  name: "Footing",                           duration: 3,  dependency: [2],        manualStart: null, status: "Not Started", progress: 0,  trade: "AT McLaren",                 notes: "Footing forms, rebar, pour." },
+  { id: 31, name: "Foundation",                        duration: 3,  dependency: [3],        manualStart: null, status: "Not Started", progress: 0,  trade: "Total Excavation",           notes: "Foundation walls & slab per Total Excavation scope." },
+  { id: 4,  name: "Underground Services",              duration: 4,  dependency: [31],       manualStart: null, status: "Not Started", progress: 0,  trade: "Plumbing / Utilities",       notes: "Under-slab plumbing, drainage, conduit." },
   { id: 5,  name: "Foundation Walls / Waterproofing",  duration: 8,  dependency: [4],        manualStart: null, status: "Not Started", progress: 0,  trade: "Concrete Contractor",        notes: "Foundation walls, damp-proofing, cure time." },
   { id: 6,  name: "Backfill",                          duration: 3,  dependency: [5],        manualStart: null, status: "Not Started", progress: 0,  trade: "Excavation Contractor",      notes: "Backfill & compact around foundation." },
   { id: 7,  name: "Framing",                           duration: 22, dependency: [6],        manualStart: null, status: "Not Started", progress: 0,  trade: "Framing Crew",               notes: "Floor, wall, and roof framing." },
@@ -123,4 +124,19 @@ BASELINE_MILESTONES.forEach((m) => {
   This file starts with zero trades; add them from the live site's
   "+ Add Trade" button, no code editing required.
 */
-const BASELINE_TRADES = [];
+const BASELINE_TRADES = [
+  {
+    tradeId: "TRD-001", tradeName: "AT McLaren", vendor: "AT McLaren", scope: "Footing",
+    milestoneIds: [3], contractAmount: 0, hst: 0, workStatus: "Not Started",
+    paymentTerms: "", poNumber: "", notes: "",
+    active: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    changeOrders: [], invoices: [], payments: [],
+  },
+  {
+    tradeId: "TRD-002", tradeName: "Total Excavation", vendor: "Total Excavation", scope: "Excavation & Foundation",
+    milestoneIds: [2, 31], contractAmount: 0, hst: 0, workStatus: "Not Started",
+    paymentTerms: "", poNumber: "", notes: "",
+    active: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    changeOrders: [], invoices: [], payments: [],
+  },
+];

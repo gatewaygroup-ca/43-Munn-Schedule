@@ -306,6 +306,10 @@ html, body {
 .activity-pager { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim); }
 .activity-pager button:disabled { opacity: 0.4; cursor: default; }
 
+.checkbox-list { max-height: 160px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; background: var(--bg); }
+.checkbox-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12.5px; cursor: pointer; }
+.checkbox-row input { margin: 0; }
+
 footer.appfooter {
   margin-top: 18px; font-size: 11.5px; color: var(--text-faint);
   display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px;
