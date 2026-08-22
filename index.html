@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>43 Munn — Project Schedule</title>
+<title>Project Schedule</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -13,18 +13,28 @@
 
   <!-- ===== Top bar ===== -->
   <div class="topbar">
-    <div>
-      <div class="brand-eyebrow" id="projType">Residential Construction</div>
-      <div class="brand-title" id="projAddress">43 MUNN</div>
-      <div class="brand-sub">Project milestone schedule &amp; live tracker</div>
+    <div class="brand-row">
+      <div class="brand-logo-slot" id="brandLogoSlot" style="display:none;">
+        <img id="brandLogoImg" alt="Company logo">
+      </div>
+      <div>
+        <div class="brand-eyebrow" id="projType">Residential Construction</div>
+        <div class="brand-title" id="projAddress">PROJECT ADDRESS</div>
+        <div class="brand-sub" id="projSubtitle">Project milestone schedule &amp; live tracker</div>
+      </div>
     </div>
     <div class="toolbar">
-      <button class="btn" id="btnToggleHolidays">Holidays</button>
-      <button class="btn" id="btnImport">Import Excel / CSV</button>
+      <button class="btn admin-only" id="btnToggleHolidays">Holidays</button>
+      <button class="btn admin-only" id="btnImport">Import Excel / CSV</button>
       <button class="btn" id="btnExport">Export Schedule</button>
-      <button class="btn" id="btnExportFinancials">Export Trade Financials</button>
-      <button class="btn danger" id="btnReset">Reset to Original Schedule</button>
+      <button class="btn admin-only" id="btnExportFinancials">Export Trade Financials</button>
+      <button class="btn danger admin-only" id="btnReset">Reset to Original Schedule</button>
+      <button class="btn primary admin-only" id="btnOpenAdminPanel">Admin Panel</button>
+      <button class="btn" id="btnLogin">Admin</button>
+      <button class="btn admin-only" id="btnLogout">Log Out</button>
       <input type="file" id="csvFileInput" accept=".csv" style="display:none">
+      <input type="file" id="logoFileInput" accept="image/png,image/jpeg,image/webp" style="display:none">
+      <input type="file" id="galleryFileInput" accept="image/png,image/jpeg,image/webp" multiple style="display:none">
     </div>
   </div>
 
@@ -67,7 +77,7 @@
   <div class="card" style="margin-bottom:14px;">
     <div class="trade-header">
       <h2 style="margin:0;">Trade Costs</h2>
-      <button class="btn primary" id="btnAddTrade">+ Add Trade</button>
+      <button class="btn primary admin-only" id="btnAddTrade">+ Add Trade</button>
     </div>
     <div class="chips" id="tradeFilterTabs" style="margin-top:10px;"></div>
     <div class="trade-table-wrap">
@@ -85,7 +95,10 @@
 
   <!-- ===== Gantt timeline ===== -->
   <div class="card gantt-card">
-    <h2>Interactive Timeline</h2>
+    <div class="trade-header">
+      <h2 style="margin:0;">Interactive Timeline</h2>
+      <button class="btn primary admin-only" id="btnAddMilestone">+ Add Milestone</button>
+    </div>
     <div class="chips" id="statusFilters" style="padding:0 20px;"></div>
     <div class="gantt-scroll">
       <div class="gantt-wrap" id="ganttWrap">
@@ -132,7 +145,7 @@
   </div>
 
   <footer class="appfooter">
-    <span>43 Munn — Project Milestone Schedule &nbsp;·&nbsp; <span id="syncStatus">Connecting…</span></span>
+    <span><span id="footerProjectLabel">Project Milestone Schedule</span> &nbsp;·&nbsp; <span id="syncStatus">Connecting…</span> &nbsp;·&nbsp; <span id="roleBadge" class="role-badge">Client view (read-only)</span></span>
     <span id="lastUpdated"></span>
   </footer>
 </div>
@@ -147,8 +160,13 @@
     <div class="modal-tabs">
       <button class="modal-tab active" id="tabBtnSchedule">Schedule</button>
       <button class="modal-tab" id="tabBtnFinancials">💰 Trades</button>
+      <button class="modal-tab" id="tabBtnGallery">🖼️ Gallery</button>
     </div>
     <div class="modal-body" id="scheduleTabContent">
+      <div class="field admin-only">
+        <label>Description</label>
+        <textarea id="mDescription" placeholder="Optional longer description of this milestone"></textarea>
+      </div>
       <div class="field">
         <label>Dependencies</label>
         <div class="dep-static" id="mDependency"></div>
@@ -163,7 +181,7 @@
           <div class="dep-static" id="mFinishDisplay"></div>
         </div>
       </div>
-      <button class="link-btn" id="btnClearManualStart">Reset start to dependency-calculated date</button>
+      <button class="link-btn admin-only" id="btnClearManualStart">Reset start to dependency-calculated date</button>
       <div class="field-row">
         <div class="field">
           <label>Duration (business days)</label>
@@ -180,11 +198,21 @@
           </select>
         </div>
       </div>
-      <div class="field">
-        <label>Progress</label>
-        <div class="range-row">
-          <input type="range" id="mProgress" min="0" max="100" step="5">
-          <span id="mProgressLabel">0%</span>
+      <div class="field-row">
+        <div class="field">
+          <label>Progress</label>
+          <div class="range-row">
+            <input type="range" id="mProgress" min="0" max="100" step="5">
+            <span id="mProgressLabel">0%</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Priority</label>
+          <select id="mPriority">
+            <option>Low</option>
+            <option>Normal</option>
+            <option>High</option>
+          </select>
         </div>
       </div>
       <div class="field">
@@ -198,9 +226,15 @@
       <div class="modal-error" id="mError"></div>
     </div>
     <div class="modal-body" id="financialsTabContent" style="display:none;"></div>
+    <div class="modal-body" id="galleryTabContent" style="display:none;"></div>
     <div class="modal-foot" id="scheduleModalFoot">
+      <button class="btn danger admin-only" id="btnDeleteModal">Delete</button>
+      <button class="btn admin-only" id="btnDuplicateModal">Duplicate</button>
+      <button class="btn admin-only" id="btnMoveUpModal" title="Move earlier in list">▲</button>
+      <button class="btn admin-only" id="btnMoveDownModal" title="Move later in list">▼</button>
+      <div style="flex:1;"></div>
       <button class="btn" id="btnCancelModal">Cancel</button>
-      <button class="btn primary" id="btnSaveModal">Save Changes</button>
+      <button class="btn primary admin-only" id="btnSaveModal">Save Changes</button>
     </div>
   </div>
 </div>
@@ -229,8 +263,63 @@
   </div>
 </div>
 
+<!-- ===== Admin Login modal ===== -->
+<div class="modal-overlay" id="loginModalOverlay">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-head">
+      <h3>Admin Login</h3>
+      <button class="icon-btn" id="btnCloseLoginModal" style="font-size:22px;">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="loginEmail" autocomplete="username">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="loginPassword" autocomplete="current-password">
+      </div>
+      <div class="modal-error" id="loginError"></div>
+      <div class="metric-note">Everyone else viewing this site sees a read-only client view. Admin accounts are created in the Firebase console — see README.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="btnCancelLogin">Cancel</button>
+      <button class="btn primary" id="btnSubmitLogin">Log In</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Admin Panel modal ===== -->
+<div class="modal-overlay" id="adminPanelOverlay">
+  <div class="modal admin-panel-modal">
+    <div class="modal-head">
+      <h3>Admin Panel</h3>
+      <button class="icon-btn" id="btnCloseAdminPanel" style="font-size:22px;">×</button>
+    </div>
+    <div class="modal-tabs" id="adminPanelTabs">
+      <button class="modal-tab active" data-admin-tab="project">Project</button>
+      <button class="modal-tab" data-admin-tab="branding">Branding</button>
+      <button class="modal-tab" data-admin-tab="holidays">Holidays</button>
+    </div>
+    <div class="modal-body" id="adminPanelBody"></div>
+    <div class="modal-foot">
+      <button class="btn" id="btnCloseAdminPanel2">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Photo lightbox ===== -->
+<div class="lightbox-overlay" id="lightboxOverlay">
+  <button class="icon-btn lightbox-close" id="btnCloseLightbox">×</button>
+  <button class="lightbox-nav lightbox-prev" id="btnLightboxPrev">‹</button>
+  <img id="lightboxImg" alt="">
+  <button class="lightbox-nav lightbox-next" id="btnLightboxNext">›</button>
+  <div class="lightbox-caption" id="lightboxCaption"></div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="data.js"></script>
 <script src="script.js"></script>

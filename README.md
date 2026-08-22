@@ -1,339 +1,293 @@
-# 43 Munn — Interactive Project Milestone Schedule
+# Project Schedule Portal — Admin/Client Real-Time Tracker
 
-A static, interactive construction schedule / milestone tracker for **43 Munn**
-(Residential Construction, start Fri Aug 7, 2026, target completion Apr 7, 2027).
+One shared codebase that powers both the 43 Munn and 38 Niagara project
+sites (and any future project you clone it for). Same UI, same Gantt
+engine, same financial system as before — now with a real-time admin
+editing layer and a read-only client view backed by actual Firebase
+Authentication and Security Rules.
 
-No build tools, no backend, no dependencies beyond a Google Fonts link — it runs
-as plain HTML/CSS/JS and is ready to host on GitHub Pages.
+## What's new vs. the original site
 
-## Files
+- **Admin / Client roles**, enforced by Firebase Auth + Realtime Database
+  Security Rules (not just hidden buttons — see "Security model" below).
+- **Admin Panel**: edit project title, address, client name, type, dates,
+  status, description, manager/contact, subtitle, footer text, and a
+  "show financials to clients" toggle — all live, all synced instantly.
+- **Company logo** upload/replace/remove, persisted in the database
+  (not a browser blob — survives refresh, shows for every visitor).
+- **Milestone galleries**: upload photos per milestone, caption them,
+  delete/replace, view in a lightbox with prev/next. Client view is
+  strictly view-only.
+- **Milestone management**: add, duplicate, delete, reorder — from the
+  browser, no code edits required.
+- **Everything still real-time**: admin changes anywhere (settings,
+  milestones, trades, financials, holidays, galleries, logo) push to
+  every open browser instantly via Firebase listeners.
 
-```
-index.html          Page structure and the milestone edit modal
-style.css            All styling (light, neutral, professional PM aesthetic)
-data.js              PROJECT info, statutory holidays, and the 30-phase baseline schedule
-script.js            Business-day engine, dependency scheduling, rendering, edit/import/export logic
-firebase-config.js   Firebase project credentials + live-sync connection
-README.md            This file
-```
-
-Upload all five of `index.html`, `style.css`, `script.js`, `data.js`,
-`firebase-config.js` (plus this README) to GitHub — those five are the entire
-application.
-
-## Live sync (Firebase Realtime Database)
-
-This build is connected to a free Firebase Realtime Database. Any edit made in
-the app — status/progress changes, imports, resets, holiday changes — is
-written to `https://munn-schedule-default-rtdb.firebaseio.com/schedule` and
-pushed to every open copy of the site in real time. The footer shows
-**🔥 Live sync on** when connected; if `firebase-config.js` is missing or
-misconfigured it falls back to **Local mode** (edits only persist in that
-browser tab, same as before).
-
-**Security note:** the database is currently readable and writable by anyone
-with its address (no login required) — fine for an internal team tool, but
-worth tightening if this ever needs to be locked down. To restrict it later:
-
-1. In the Firebase console, go to Realtime Database → **Rules**.
-2. Replace the rules with something like:
-   ```json
-   {
-     "rules": {
-       "schedule": {
-         ".read": true,
-         ".write": true,
-         ".validate": "newData.hasChildren(['milestones', 'holidays'])"
-       }
-     }
-   }
-   ```
-   — or, for real access control, add [Firebase Authentication](https://firebase.google.com/docs/auth)
-   (e.g. email/password or Google sign-in for your team) and require
-   `auth != null` in the write rule.
-3. Click **Publish**.
+Nothing about the existing look was changed — colors, layout, Gantt
+rendering, financial calculations, and mobile behavior are untouched.
 
 ---
 
-## 1. How to edit the schedule
+## 1. Project overview
 
-**In the browser (no code):**
-Click any milestone — on the Gantt bar (desktop) or the card (mobile) — to open
-its detail panel. You can change:
+Each deployed site is one project (e.g. "43 Munn" or "38 Niagara"),
+identified by `PROJECT_ID` in that repo's `data.js`. All of a project's
+live data lives under `projects/{PROJECT_ID}/` in one shared Firebase
+Realtime Database, so multiple project sites can run off the same
+Firebase project without their data ever mixing.
 
-- Start date (overrides the dependency-calculated date — see "Reset start" link)
-- Duration (business days)
-- Status (Not Started / In Progress / Complete / Delayed / On Hold)
-- Progress (0–100%, slider)
-- Assigned trade
-- Notes
+Anyone who opens the site sees the **client view**: full dashboard,
+timeline, milestone details, galleries, and (optionally) financials —
+entirely read-only. Clicking **Admin** and logging in with a Firebase
+Auth account switches that browser into **admin mode**, unlocking every
+editing control described above. Logging out (or simply not being
+signed in) returns to client view.
 
-Click **Save Changes**. Every dependent milestone recalculates immediately, the
-dashboard metrics update, and an entry is added to **Recent Activity** — including
-a "Schedule impact: ±N business days" note if the change shifted the projected
-completion date.
+---
 
-**In the source data (`data.js`):**
-Edit the `BASELINE_MILESTONES` array directly — this is the schedule everyone
-sees on first load, and what **Reset to Original Schedule** restores. Each row is:
+## 2. Admin setup (one-time, in the Firebase console)
 
-```js
-{ id, name, duration, dependency: [ids], manualStart: null, status, progress, trade, notes }
-```
+You're on the **Spark (free) plan** currently. Everything below works on
+Spark — you do **not** need to upgrade to use Authentication or the
+admin/client system. The one thing Spark doesn't include is Firebase
+*Storage*, which is why photos/logos use a different storage approach
+here (see section 5).
 
-`dependency` is an array of milestone `id`s that must finish before this one
-starts (empty array = starts at the project start date). Multiple ids means the
-milestone waits for the *latest* of them to finish — this is how parallel trades
-(e.g. Plumbing/HVAC/Electrical rough-in) and convergence points (e.g. Flooring
-waiting on Trim, Cabinetry, and Tile) are modeled.
+### a) Enable Authentication
+1. Firebase console → your project (`munn-schedule`) → **Build → Authentication**
+2. Click **Get started**
+3. Under **Sign-in method**, enable **Email/Password**
+4. Under **Users**, click **Add user** and create an account for each
+   admin (yourself, Cory, etc.) — just an email + password. This is the
+   *only* place admin accounts are created. Nothing in this codebase
+   stores or checks a password.
 
-## 2. How the business-day calculation works
+Anyone who successfully signs in with a Firebase Auth account on this
+project is treated as an admin. There's no separate roles table — access
+control is simply "did you authenticate," which is enforced by the
+Security Rules below, not by the app's JavaScript.
 
-Two core functions in `script.js`:
+### b) Publish the Security Rules
+1. Firebase console → **Build → Realtime Database → Rules**
+2. Replace the existing rules with the contents of
+   [`firebase-database-rules.json`](./firebase-database-rules.json) in
+   this repo
+3. Click **Publish**
 
-- `addBusinessDays(fromDate, duration, holidays)` — rolls `fromDate` forward to
-  the next business day if needed, then counts `duration` business days
-  (Mon–Fri, minus configured holidays), returning `{start, finish}`.
-- `calculateBusinessDays(startDate, endDate, holidays)` — signed business-day
-  distance between two dates, used for "Days Remaining" and "Schedule Variance."
+This is what actually stops a client from writing data — even if someone
+opened the browser console and called a JavaScript function directly,
+Firebase itself rejects the write with `PERMISSION_DENIED` unless
+they're signed in. The app's `USER_ROLE` checks are a UI convenience on
+top of this, not the real protection.
 
-The full schedule is produced by `computeSchedule()`, which resolves each
-milestone's start date as the next business day after the **latest** finish
-date among its dependencies (or the project start date if it has none), then
-applies `addBusinessDays`. It re-resolves automatically any time a duration,
-status, dependency, or manual start date changes — nothing is hard-coded.
+### c) That's it
+No service account keys, no server, no Cloud Functions. Everything else
+(hosting, config) works exactly like the site already did.
 
-**Holidays:** click **Holidays** in the toolbar to view, add, or remove the
-statutory holidays excluded from every calculation. Ontario statutory holidays
-for the project window are pre-loaded (Labour Day, Thanksgiving, Christmas,
-Boxing Day, New Year's Day, Family Day, Good Friday) — edit this list for a
-different jurisdiction or to add company-specific closures.
+---
 
-## 3. How to export the schedule to Excel
+## 3. Client access
 
-Click **Export Schedule**. This downloads `43-munn-schedule.csv` with columns:
+Clients don't need an account. They just visit the site URL — same as
+today. They automatically get the read-only view. There's no separate
+`/admin` URL or query parameter to worry about: the **Admin** button in
+the toolbar is how anyone (staff or otherwise) reaches the login form,
+and Firebase Rules are what actually decide whether their sign-in
+attempt (if they even have credentials) is allowed to write.
 
-```
-ID | Milestone | Start Date | Duration (Business Days) | Finish Date | Status | Progress % | Trade | Dependency | Notes
-```
+If you want a cleaner mental model: think of "admin mode" as *whichever
+browser is currently signed in*, not a separate site.
 
-Open it directly in Excel — the *Dependency* column uses `;` to separate
-multiple dependency IDs (e.g. `10;11;12`). A starter copy of this file
-(`43-munn-schedule-template.csv`) is included alongside this README so you can
-open the baseline schedule in Excel right away without touching the app.
+---
 
-## 4. How to import an updated Excel/CSV schedule
+## 4. Project configuration — how a new project is created
 
-In Excel, edit the exported CSV — change dates, durations, statuses, progress,
-trades, or notes, then save it as **CSV (Comma delimited)**. Back in the app,
-click **Import Excel / CSV** and select the file.
+To spin up a third project on this same codebase:
 
-On import, the app:
-1. Validates every row (numeric IDs, no duplicate IDs, valid status values,
-   dependencies that reference real IDs, durations ≥ 1, progress 0–100)
-2. Replaces the entire milestone set
-3. Recalculates every start/finish date, overall progress, projected
-   completion, and schedule variance
-4. Refreshes the Gantt timeline, mobile list, dashboard, and summary
-5. Logs the import to Recent Activity
+1. Copy this whole folder
+2. In the new copy's `data.js`, change **only**:
+   - `PROJECT_ID` — a short, URL-safe, unique slug (e.g. `"12-oak"`)
+   - `DEFAULT_SETTINGS` — the new project's initial title/address/dates/etc.
+   - `BASELINE_MILESTONES` / `BASELINE_TRADES` / `DEFAULT_HOLIDAYS` — the
+     starting schedule (or leave as-is/empty and build it from the Admin
+     Panel after deploying)
+3. Deploy as its own GitHub Pages site (own repo, or a subfolder — either
+   works, since Firebase paths are scoped by `PROJECT_ID`, not by URL)
+4. `firebase-config.js`, `index.html`, `style.css`, and `script.js` are
+   **identical** across every project — never hand-edit project details
+   into them
 
-If validation fails, nothing is changed and you'll see exactly which row and
-field caused the problem.
+After first load, all further editing happens from the Admin Panel —
+you should essentially never need to touch `data.js` again except to
+redefine what "Reset to Original Schedule" restores.
 
-> Note: **Start Date** in the CSV is informational on import — the app always
-> recalculates start dates from durations + dependencies unless you also set a
-> manual override for that milestone in the app itself. This keeps the schedule
-> internally consistent (you can't accidentally create a milestone that starts
-> before its dependencies finish).
+---
 
-## 5. How to publish this on GitHub Pages
+## 5. Gallery & logo image storage (important — read this)
 
-1. **Create a repository** — on GitHub, click *New repository*, name it
-   (e.g. `43-munn-schedule`), and create it (public or private, both work with
-   Pages on a paid plan; public repos get Pages free).
-2. **Upload the files** — drag `index.html`, `style.css`, `script.js`, and
-   `data.js` into the repo (use "Add file → Upload files" in the GitHub web UI,
-   or `git add . && git commit -m "Initial schedule" && git push` from the
-   command line).
-3. **Enable GitHub Pages** — go to *Settings → Pages*, under "Build and
-   deployment" set **Source** to `Deploy from a branch`, branch `main`,
-   folder `/ (root)`, then **Save**.
-4. **Publish** — GitHub gives you a URL like
-   `https://<your-username>.github.io/43-munn-schedule/` within a minute or two.
-5. **Update the website** — commit and push changes to `data.js` (new baseline)
-   or any other file; GitHub Pages redeploys automatically within a minute.
+Firebase **Storage** (the normal place to put uploaded files) requires
+the **Blaze** billing plan. Since this project is on Spark, photos and
+the company logo are instead:
 
-## 6. How to eventually connect this to live Excel data
+1. Compressed and resized client-side (canvas-based, before upload)
+2. Converted to a base64 data URL
+3. Written directly into the Realtime Database, inside the
+   milestone's `gallery` array (photos) or `settings.companyLogoDataUrl`
+   (logo)
 
-The app is intentionally decoupled from its data source — everything reads
-from the `PROJECT`, `DEFAULT_HOLIDAYS`, and `BASELINE_MILESTONES` objects in
-`data.js`, or from an imported CSV. Three paths forward, in increasing order
-of automation:
+This is genuinely persistent — it syncs via Firebase like everything
+else, survives refreshes, and shows the same for every visitor. It is
+**not** a `blob:` URL and does not depend on any one browser's memory.
 
-**Option A — Simple (manual, works today)**
-Edit the schedule in Excel → export as CSV → use **Import Excel / CSV** in the
-app (or replace `data.js`'s `BASELINE_MILESTONES` and push to GitHub). No new
-infrastructure required.
+Two sizes are generated per photo: a small thumbnail (used in the grid,
+lazy-loaded) and a larger version (loaded only when you open the
+lightbox), so the dashboard stays fast even as galleries grow.
 
-**Option B — Automated (Excel stays the source of truth)**
-```
-Excel on OneDrive / SharePoint
-        ↓
-Power Automate / Microsoft Graph API
-        ↓
-A small JSON endpoint (e.g. an Azure Function or a scheduled export)
-        ↓
-script.js fetches it instead of reading data.js
-        ↓
-Live dashboard, refreshed on page load
-```
-This requires adding one `fetch()` call in `script.js`'s `init()` that loads
-milestone JSON from that endpoint before calling `renderAll()` — the rest of
-the app (scheduling engine, Gantt, editing, dashboard) needs no changes.
+**Trade-offs of this approach**, so you can decide if/when to upgrade:
+- Realtime Database has practical limits — this is fine for dozens of
+  photos per project, but if you expect *hundreds*, Firebase Storage
+  (below) is the better long-term fit.
+- Each photo write is somewhat larger than a Storage-based approach
+  (base64 inflates size ~33%), which is why photos are compressed
+  fairly aggressively (1600px / JPEG q0.75 for full-size, 320px / q0.7
+  for thumbnails).
 
-**Option C — Database-backed**
-```
-Excel → Automation (Power Automate / script) → Supabase (or any DB) → website
-```
-Same idea as Option B, but `script.js` would call Supabase's REST/JS client
-instead of a custom endpoint. Useful once multiple people need to edit the
-schedule concurrently, since Supabase can also enforce validation and keep a
-change history server-side instead of relying on the in-browser session log.
+### Upgrading to Firebase Storage later (when you're ready for Blaze)
 
-In all three options, the milestone shape stays identical to the CSV columns
-above, so `computeSchedule()` and every rendering function keep working
-unchanged — only *where the data comes from* changes.
+The swap is contained to two functions in `script.js`:
 
-## 8. Trade financials — how the data is structured
+- `compressImageToDataUrl()` → change to upload the compressed
+  `Blob`/`File` via `storageRef.put(file)` and store the resulting
+  `getDownloadURL()` string instead of a data URL
+- Everywhere a photo/logo's `dataUrl` / `thumbDataUrl` /
+  `companyLogoDataUrl` is read, it already just expects "a URL the
+  browser can load" — a Storage download URL works as a drop-in
+  replacement, no other code needs to change
 
-Trades are **independent records**, decoupled from milestones — not
-embedded in them. Each trade has a stable ID that never changes even if you
-rename it:
+We didn't wire this up now since Storage isn't enabled on your plan, but
+the data model was deliberately kept URL-based (not "always a data URI")
+so this upgrade doesn't require restructuring anything later.
 
-```js
-{
-  tradeId: "TRD-001",            // stable, never reused, never based on the name
-  tradeName: "Roofing",
-  vendor: "ABC Roofing",
-  scope: "Roofing installation",
-  milestoneId: 8,                // optional link to a milestone, or null for none —
-                                  // multiple trades can point at the same milestone,
-                                  // and a milestone can have zero trades
-  contractAmount: 25000,
-  hst: 3250,
-  workStatus: "In Progress",     // "Not Started" | "In Progress" | "Complete" | "On Hold"
-  paymentTerms: "Net 30",
-  poNumber: "PO-1044",
-  notes: "",
-  active: true,                  // false = archived (excluded from active totals,
-                                  // history preserved, restorable any time)
-  createdAt, updatedAt,
+---
 
-  changeOrders: [
-    { changeOrderId, description, date, amount, approvedBy, status, notes }
-    // status: "Pending" | "Approved" | "Rejected" — only Approved counts
-    // toward the revised contract value
-  ],
-  invoices: [
-    { invoiceId, invoiceNumber, vendor, invoiceDate, dueDate,
-      subtotal, hst, total, fileName, notes }
-    // no paymentStatus field here — an invoice's paid/unpaid/overdue state
-    // is derived from whichever payments reference its invoiceId
-  ],
-  payments: [
-    { paymentId, invoiceId, amount, date, method, reference, notes }
-    // invoiceId can be null — a payment can be recorded before (or without)
-    // a matching invoice; the app warns but doesn't block this
-  ]
-}
-```
-
-Everything else — revised contract value, total invoiced, total paid,
-outstanding balance, per-invoice overdue status, and the trade's overall
-payment status — is **calculated live** every time the page renders (see
-`revisedContractValue()`, `tradeTotalInvoiced()`, `tradeTotalPaid()`,
-`tradeOutstanding()`, `invoiceOverdue()`, `tradePaymentStatus()` in
-`script.js`). Nothing financial is ever pre-computed and stored.
-
-**Archiving vs. deleting.** Removing a trade that has any invoices,
-payments, or change orders offers **Archive** as the primary path — the
-trade disappears from the active Trade Costs view and active financial
-totals, but every record stays intact and it can be restored any time from
-the "Archived" filter. Permanently deleting a trade with financial history
-requires typing `DELETE` to confirm; a trade with no financial history at
-all can be removed with a single confirmation, since there's nothing to
-lose.
-
-**Invoice PDFs are a prototype feature, not persisted.** When you attach a
-PDF to an invoice, the app keeps it in the browser's memory for that session
-only (via `URL.createObjectURL`) so you can preview/download it right away —
-it is **not** uploaded anywhere and does **not** sync through Firebase (PDF
-files are far too large for a realtime database, and the project brief is
-explicit that GitHub/Firebase should never become the permanent home for
-financial documents). Only the invoice's *metadata* (number, vendor, dates,
-amounts, and the filename as a label) syncs live like everything else.
-Reopen the site in a new tab or on another device and you'll see the
-invoice listed, but "View"/"Download" will explain the PDF itself isn't
-available there — that's expected until real file storage is wired in.
-
-## 9. Connecting real Excel and document storage later
-
-The target structure, matching what a full Excel workbook or database for
-this project would look like:
-
-| Sheet | Columns |
-|---|---|
-| **PROJECT** | Project ID, Address, Start Date, Target Completion |
-| **MILESTONES** | ID, Milestone, Start Date, Duration, Finish Date, Status, Progress %, Trade, Dependency, Notes |
-| **TRADES** | Trade ID, Project ID, Trade, Vendor, Scope, Original Contract, Approved Change Orders, Revised Contract, Total Invoiced, Total Paid, Outstanding, Payment Status, PO Number, Payment Terms, Notes |
-| **PAYMENTS** | Payment ID, Trade ID, Invoice ID, Payment Date, Amount, Payment Method, Payment Reference, Status, Notes |
-| **INVOICES** | Invoice ID, Trade ID, Vendor, Invoice Number, Invoice Date, Due Date, Subtotal, HST, Total, Payment Status, Payment Date, File Name, File URL/Reference, Notes |
-| **CHANGE ORDERS** | Change Order ID, Trade ID, Description, Date, Amount, Status, Approved By, Notes |
-| **HOLIDAYS** | Date, Name |
-
-Today, **Export Trade Financials** in the toolbar gives you the TRADES sheet
-as a CSV (contract values, invoiced/paid/outstanding, and payment status per
-trade, computed live). The MILESTONES sheet is covered by the existing
-**Export Schedule** button. Full PAYMENTS/INVOICES/CHANGE ORDERS sheets
-aren't separately exportable yet — they live nested inside each trade record
-in `data.js`/Firebase — but the shape above is what to target when building
-a real integration.
-
-For invoice PDFs specifically, the recommended path is:
+## 6. Data architecture
 
 ```
-Invoice PDF uploaded in the app
-        ↓
-Instead of staying in browser memory, upload to OneDrive/SharePoint,
-Google Drive, or Supabase Storage (whichever your team already uses)
-        ↓
-Store the returned file URL in the invoice's `fileName`/file-reference field
-        ↓
-"View" and "Download" open that real URL instead of a session-only blob
+projects/
+  43-munn/
+    settings/     ← title, address, clientName, dates, logo, footer text, etc.
+    schedule/
+      milestones   ← array, each with schedule/financial/gallery data
+      trades       ← array
+      holidays     ← array
+      activity     ← array
+      lastUpdated
+  38-niagara/
+    settings/ ...
+    schedule/ ...
 ```
 
-That's a backend change (a small upload endpoint or a Supabase Storage
-bucket), not a rewrite of the app — the invoice list, financial totals, and
-Trade Costs table all already work off whatever's in each invoice's fields,
-so once file uploads point at real storage instead of `URL.createObjectURL`,
-everything else keeps working unchanged.
+Each project's data is fully isolated under its own `PROJECT_ID` key —
+nothing under `projects/43-munn` can ever be touched by code running
+against `projects/38-niagara`, and vice versa.
 
-**Security reminder:** because this now includes contract values and
-banking-adjacent fields, the "database open to anyone with the link" setup
-from earlier matters more here. If you haven't already tightened the
-Firebase rules or added authentication, this is the point to prioritize it —
-see the Live Sync section above.
+**Milestones and trades are still stored as arrays** (each item carries
+its own `id`), rather than a fully normalized `milestones/{id}` map.
+This was a deliberate choice to reuse the existing, already-working
+dependency/business-day scheduling engine without rewriting it — the
+isolation you actually need (one project's data never touching
+another's) is achieved via the `projects/{PROJECT_ID}/` prefix, which is
+what the Security Rules key off of.
 
-## 10. Which files to upload to GitHub
+### Backward compatibility / migration
 
-Minimum required for the site to work on GitHub Pages:
+If this project previously stored its data at a flat `schedule` (43
+Munn) or `schedule_38niagara` (38 Niagara) path — i.e. the version of
+the site before this admin/client upgrade — the app automatically
+copies that data into the new `projects/{PROJECT_ID}/schedule` location
+the first time it loads, and only if the new location doesn't already
+have data. It never deletes the old node, and it only runs once
+(subsequent loads find the new location already populated and skip it).
+No manual database surgery is required.
 
-- `index.html`
-- `style.css`
-- `script.js`
-- `data.js`
+---
 
-Recommended to include:
+## 7. Security model (read this if anything about "read-only" feels unclear)
 
-- `README.md` (this file)
-- `43-munn-schedule-template.csv` (starter Excel file, matches the export/import format)
+There are two layers, and only one of them is real security:
+
+- **UI layer (`USER_ROLE`, the `admin-only` CSS class, disabled form
+  fields)** — this is convenience only. It hides buttons and disables
+  inputs so a client never *sees* an edit control, and it also adds a
+  client-side early-return in write functions like `firebaseSave()`.
+  None of this is trustworthy on its own — anyone can open dev tools and
+  ignore it.
+- **Firebase Security Rules (`firebase-database-rules.json`)** — this is
+  the actual enforcement. `.write: "auth != null"` means Firebase itself
+  refuses any write from a browser that isn't signed in, full stop,
+  regardless of what JavaScript does or doesn't run. This is what makes
+  "client is read-only" a real guarantee rather than a UI suggestion.
+
+No admin password, API key secret, or service-account credential is
+stored anywhere in this repository. The `firebaseConfig` object in
+`firebase-config.js` is a public identifier (which Firebase project to
+talk to), not a secret — it grants no access by itself.
+
+---
+
+## 8. Managing milestones
+
+- **Add**: "+ Add Milestone" button above the Gantt (admin only)
+- **Duplicate / Delete / Reorder**: open any milestone → footer buttons
+  (Duplicate, Delete, ▲/▼). Deleting a milestone that other milestones
+  depend on shows a warning listing exactly which ones, and
+  automatically removes the dead dependency reference so the schedule
+  doesn't break.
+- **Edit everything else** (name via duplicate+rename, description,
+  duration, dependencies via CSV re-import, status, progress, priority,
+  trade, notes): from the milestone modal's Schedule tab
+- **Gallery**: the milestone modal's new Gallery tab
+
+---
+
+## 9. Financial visibility control
+
+Admin Panel → Project tab → "Show financial information to clients"
+checkbox. Off by default. When off, clients cannot see contract values,
+invoices, payments, outstanding balances, or change-order amounts (the
+Trade Financials export is also blocked client-side for consistency);
+admins always see everything regardless of this setting.
+
+---
+
+## 10. Deployment (GitHub Pages)
+
+Same as before — this is still a static site, no build step:
+
+1. Push all files (`index.html`, `style.css`, `script.js`, `data.js`,
+   `firebase-config.js`, `firebase-database-rules.json`, this README) to
+   the project's repo, `main` branch
+2. Settings → Pages → Deploy from branch → `main` / root
+3. Complete the Firebase console steps in section 2 (once per Firebase
+   project — not per site, since both 43 Munn and 38 Niagara share the
+   same Firebase project)
+
+---
+
+## 11. Testing checklist
+
+**Admin**: log in → change project title/address/client/dates → upload
+a logo → add a milestone → edit it (status/progress/priority) → add
+gallery photos → edit a caption → delete a photo → add a trade → add a
+change order/invoice/payment → add a holiday → confirm each change
+appears in Recent Activity → open a second browser (or incognito) and
+confirm every change above appears there automatically, no refresh.
+
+**Client**: open in a signed-out browser → confirm project info, logo,
+dashboard, timeline, and galleries all display correctly → open a
+milestone → view its gallery → open the lightbox, use next/prev/close →
+confirm no Save/Edit/Delete/Add/Archive/Import/Export/Reset controls are
+visible anywhere → open dev tools and try calling `firebaseSave()` or
+writing to the database directly → confirm Firebase rejects it with a
+permission error.
