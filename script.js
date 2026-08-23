@@ -832,6 +832,8 @@ function renderSummary() {
     ["Start", fmtDate(parseISO(PROJECT.start))],
     ["Target Completion", fmtDate(parseISO(PROJECT.targetCompletion))],
     ["Projected Completion", projected ? fmtDate(projected) : "—"],
+    ["Construction Manager", PROJECT.projectManager || "—"],
+    ["Project Operations Coordinator", PROJECT.operationsCoordinator || "—"],
     ["Total Milestones", STATE.milestones.length],
     ["Completed", counts["Complete"] || 0],
     ["In Progress", counts["In Progress"] || 0],
@@ -2524,9 +2526,10 @@ function renderAdminProjectTab() {
     </div>
     <div class="field"><label>Description</label><textarea id="apDescription">${escapeHtml(s.description)}</textarea></div>
     <div class="field-row">
-      <div class="field"><label>Project Manager</label><input id="apManager" value="${escapeAttr(s.projectManager)}"></div>
-      <div class="field"><label>Contact</label><input id="apContact" value="${escapeAttr(s.contact)}"></div>
+      <div class="field"><label>Construction Manager</label><input id="apManager" value="${escapeAttr(s.projectManager)}"></div>
+      <div class="field"><label>Project Operations Coordinator</label><input id="apOpsCoordinator" value="${escapeAttr(s.operationsCoordinator)}"></div>
     </div>
+    <div class="field"><label>Client Contact</label><input id="apContact" value="${escapeAttr(s.contact)}"></div>
     <div class="field"><label>Subtitle</label><input id="apSubtitle" value="${escapeAttr(s.subtitle)}"></div>
     <div class="field"><label>Footer Text (optional — blank uses default)</label><input id="apFooterText" value="${escapeAttr(s.footerText)}"></div>
     <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
@@ -2565,6 +2568,7 @@ function saveProjectSettingsFromForm() {
   s.targetCompletion = target;
   s.description = document.getElementById("apDescription").value.trim();
   s.projectManager = document.getElementById("apManager").value.trim();
+  s.operationsCoordinator = document.getElementById("apOpsCoordinator").value.trim();
   s.contact = document.getElementById("apContact").value.trim();
   s.subtitle = document.getElementById("apSubtitle").value.trim();
   s.footerText = document.getElementById("apFooterText").value.trim();

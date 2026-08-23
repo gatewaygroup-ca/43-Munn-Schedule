@@ -22,7 +22,8 @@ const DEFAULT_SETTINGS = {
   companyName: "Gateway Group",
   companyLogoDataUrl: null,
   subtitle: "Project milestone schedule & live tracker",
-  projectManager: "",
+  projectManager: "",       // now labeled "Construction Manager" in the Admin UI
+  operationsCoordinator: "", // "Project Operations Coordinator" in the Admin UI
   contact: "",
   footerText: "",
   showFinancialsToClients: false,
