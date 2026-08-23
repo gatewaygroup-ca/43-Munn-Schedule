@@ -224,6 +224,7 @@ function sanitizeMilestone(m) {
     id: m.id,
     name: m.name,
     description: m.description || "",
+    order: Number.isFinite(m.order) ? m.order : 0,
     duration: m.duration,
     dependency: Array.isArray(m.dependency) ? m.dependency : [],
     manualStart: (m.manualStart === undefined || m.manualStart === null) ? null : m.manualStart,
@@ -296,6 +297,7 @@ function rehydrateMilestone(m) {
   return {
     ...m,
     description: m.description || "",
+    order: Number.isFinite(m.order) ? m.order : 0, // 0 = "no order yet"; migrateMilestoneOrder() assigns real values
     dependency: Array.isArray(m.dependency) ? m.dependency : [],
     manualStart: m.manualStart === undefined ? null : m.manualStart,
     trade: m.trade || "",
@@ -538,9 +540,11 @@ function firebaseListen() {
       STATE.activity = (val.activity || []).map(a => ({ text: a.text, time: new Date(a.time) }));
       STATE.lastUpdated = val.lastUpdated ? new Date(val.lastUpdated) : new Date();
       FIREBASE_READY = true;
-      const migrated = migrateFootingFoundationSplit();
-      if (migrated && USER_ROLE === "admin") firebaseSave();
+      const migratedSplit = migrateFootingFoundationSplit();
+      const migratedOrder = migrateMilestoneOrder();
+      if ((migratedSplit || migratedOrder) && USER_ROLE === "admin") firebaseSave();
       renderAll();
+      renderAdminMilestonesList();
     }, (err) => {
       console.error("Firebase listen failed:", err);
     });
@@ -2494,6 +2498,7 @@ function switchAdminTab(tab) {
   });
   if (tab === "project") renderAdminProjectTab();
   else if (tab === "branding") renderAdminBrandingTab();
+  else if (tab === "milestones") renderAdminMilestonesList();
   else if (tab === "holidays") renderAdminHolidaysTab();
 }
 
@@ -2654,6 +2659,30 @@ function renderAdminHolidaysTab() {
    MILESTONE MANAGEMENT — add / duplicate / delete / reorder
    ============================================================ */
 
+// Keeps the explicit `order` field on every milestone in sync with its
+// current array position (1-based). Array position is, and remains, the
+// single source of truth for display order everywhere (Gantt, mobile
+// list, upcoming milestones, CSV export) -- `order` is a persisted,
+// explicit mirror of that so the sequence is never inferred from
+// something as fragile as "whatever order Firebase happens to return
+// array items in," and so a future normalized data model has a real
+// field to key off. This never touches dependency, date, or duration
+// data -- order and scheduling are intentionally independent.
+function renumberMilestoneOrder() {
+  STATE.milestones.forEach((m, i) => { m.order = i + 1; });
+}
+
+// One-time backward-compat migration for milestones saved before the
+// `order` field existed (sentinel value 0 from rehydrateMilestone).
+// Assigns order strictly from each milestone's CURRENT array position --
+// i.e. whatever sequence was already live is preserved exactly, nothing
+// is reshuffled.
+function migrateMilestoneOrder() {
+  const needsMigration = STATE.milestones.some(m => !m.order || m.order === 0);
+  if (needsMigration) renumberMilestoneOrder();
+  return needsMigration;
+}
+
 function nextMilestoneId() {
   return STATE.milestones.length ? Math.max(...STATE.milestones.map(m => m.id)) + 1 : 1;
 }
@@ -2666,6 +2695,7 @@ function addMilestone() {
     id: nextMilestoneId(),
     name: name.trim(),
     description: "",
+    order: STATE.milestones.length + 1,
     duration: 5,
     dependency: [],
     manualStart: null,
@@ -2681,10 +2711,12 @@ function addMilestone() {
     paymentDetails: { vendorName: "", poNumber: "", paymentTerms: "", paymentMethod: "", bankName: "", accountName: "", accountLast4: "", paymentReference: "", notes: "" },
   };
   STATE.milestones.push(newMilestone);
+  renumberMilestoneOrder();
   STATE.lastUpdated = new Date();
   logActivity(`Milestone added: "${newMilestone.name}".`);
   firebaseSave();
   renderAll();
+  renderAdminMilestonesList();
 }
 
 function duplicateMilestone(id) {
@@ -2698,11 +2730,13 @@ function duplicateMilestone(id) {
   copy.manualStart = null;
   copy.gallery = []; // photos are milestone-specific; don't duplicate them onto a new phase
   STATE.milestones.push(copy);
+  renumberMilestoneOrder();
   STATE.lastUpdated = new Date();
   logActivity(`Milestone duplicated: "${m.name}" → "${copy.name}".`);
   firebaseSave();
   closeModal();
   renderAll();
+  renderAdminMilestonesList();
 }
 
 function deleteMilestoneById(id) {
@@ -2717,39 +2751,129 @@ function deleteMilestoneById(id) {
   if (!confirm(msg)) return;
   STATE.milestones = STATE.milestones.filter(x => x.id !== id);
   STATE.milestones.forEach(x => { x.dependency = (x.dependency || []).filter(d => d !== id); });
+  renumberMilestoneOrder();
   STATE.lastUpdated = new Date();
   logActivity(`Milestone deleted: "${m.name}".`);
   firebaseSave();
   closeModal();
   renderAll();
+  renderAdminMilestonesList();
 }
 
+// Moves a milestone up (direction -1) or down (direction +1) by one
+// position. This ONLY changes array position / the `order` field -- it
+// never touches dependency, manualStart, duration, or any date. Sequence
+// and scheduling remain fully independent, per spec.
 function reorderMilestone(id, direction) {
   if (USER_ROLE !== "admin") return;
   const idx = STATE.milestones.findIndex(x => x.id === id);
   if (idx === -1) return;
   const swapWith = idx + direction;
   if (swapWith < 0 || swapWith >= STATE.milestones.length) return;
+  const m = STATE.milestones[idx];
+  const oldPos = idx + 1;
+  const newPos = swapWith + 1;
   const tmp = STATE.milestones[idx];
   STATE.milestones[idx] = STATE.milestones[swapWith];
   STATE.milestones[swapWith] = tmp;
+  renumberMilestoneOrder();
   STATE.lastUpdated = new Date();
+  logActivity(`Milestone order changed: "${m.name}" moved from #${oldPos} to #${newPos}.`);
   firebaseSave();
   renderAll();
   renderAdminMilestonesList();
 }
 
-// Rendered inline in the Gantt card header area when in admin mode is
-// overkill for this design -- instead the Admin Panel gets a simple
-// Milestones management list accessible from the "Project" tab area via
-// each milestone's own modal (Duplicate/Delete buttons already wired in
-// the modal footer). Reorder is available via the two functions above,
-// exposed through admin-only ▲▼ controls injected into the Gantt rows.
+// Drag-and-drop reorder: moves the milestone at `fromIndex` to sit at
+// `toIndex`, shifting everything between. Same guarantees as
+// reorderMilestone() above -- only order changes, nothing schedule-related.
+function moveMilestoneToIndex(fromIndex, toIndex) {
+  if (USER_ROLE !== "admin") return;
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+  if (fromIndex >= STATE.milestones.length || toIndex >= STATE.milestones.length) return;
+  const m = STATE.milestones[fromIndex];
+  const oldPos = fromIndex + 1;
+  const newPos = toIndex + 1;
+  STATE.milestones.splice(fromIndex, 1);
+  STATE.milestones.splice(toIndex, 0, m);
+  renumberMilestoneOrder();
+  STATE.lastUpdated = new Date();
+  logActivity(`Milestone order changed: "${m.name}" moved from #${oldPos} to #${newPos}.`);
+  firebaseSave();
+  renderAll();
+  renderAdminMilestonesList();
+}
+
+/* ============================================================
+   ADMIN PANEL — Milestones tab
+   Dedicated reorder UI: ▲/▼ buttons (required, always available,
+   the accessible/mobile-friendly mechanism) plus optional drag-and-
+   drop via a ☰ handle. Buttons work with or without drag-and-drop.
+   ============================================================ */
+
+let DRAG_FROM_INDEX = null;
+
 function renderAdminMilestonesList() {
-  // Intentionally left as a hook for future dedicated "Milestones" admin
-  // tab; today, add/duplicate/delete/reorder are reachable from the
-  // Gantt row controls and the milestone modal footer, per admin-panel
-  // scope decision -- see README "Managing Milestones".
+  const el = document.getElementById("adminPanelBody");
+  if (!el || ADMIN_PANEL_TAB !== "milestones") return;
+
+  const rows = STATE.milestones.map((m, i) => {
+    const isFirst = i === 0;
+    const isLast = i === STATE.milestones.length - 1;
+    return `
+      <div class="admin-milestone-row" draggable="true" data-idx="${i}" data-id="${m.id}">
+        <span class="amr-drag-handle" title="Drag to reorder">☰</span>
+        <span class="amr-num">${i + 1}.</span>
+        <div style="flex:1; min-width:0;">
+          <div class="amr-name">${escapeHtml(m.name)}</div>
+          <div class="amr-meta">${escapeHtml(m.status)} · ${m.progress}% · ${escapeHtml(m.trade || "No trade assigned")}</div>
+        </div>
+        <button class="amr-btn" data-maction="edit" data-id="${m.id}">Edit</button>
+        <button class="amr-btn" data-maction="up" data-id="${m.id}" ${isFirst ? "disabled" : ""} title="Move up" aria-label="Move ${escapeAttr(m.name)} up">▲</button>
+        <button class="amr-btn" data-maction="down" data-id="${m.id}" ${isLast ? "disabled" : ""} title="Move down" aria-label="Move ${escapeAttr(m.name)} down">▼</button>
+      </div>
+    `;
+  }).join("");
+
+  el.innerHTML = `
+    <div class="admin-section-title">Milestones (${STATE.milestones.length})</div>
+    <div class="metric-note" style="margin-bottom:10px;">Drag the ☰ handle, or use ▲/▼ — both save instantly and update the Gantt, mobile list, and upcoming milestones. Reordering never changes dates or dependencies.</div>
+    <button class="btn primary" id="btnAdminAddMilestone" style="margin-bottom:10px;">+ Add Milestone</button>
+    <div id="adminMilestoneRows">${rows}</div>
+  `;
+
+  document.getElementById("btnAdminAddMilestone").onclick = addMilestone;
+
+  const rowsEl = document.getElementById("adminMilestoneRows");
+  rowsEl.onclick = (e) => {
+    const btn = e.target.closest("[data-maction]");
+    if (!btn || btn.disabled) return;
+    const id = parseInt(btn.dataset.id, 10);
+    if (btn.dataset.maction === "edit") { closeAdminPanel(); openModal(id); }
+    if (btn.dataset.maction === "up") reorderMilestone(id, -1);
+    if (btn.dataset.maction === "down") reorderMilestone(id, 1);
+  };
+
+  // Native HTML5 drag-and-drop -- required buttons above remain the
+  // primary, always-available mechanism (esp. on mobile, where drag
+  // targets are unreliable); this is a nice-to-have on top.
+  rowsEl.querySelectorAll(".admin-milestone-row").forEach(row => {
+    row.addEventListener("dragstart", (e) => {
+      DRAG_FROM_INDEX = parseInt(row.dataset.idx, 10);
+      e.dataTransfer.effectAllowed = "move";
+      row.classList.add("dragging");
+    });
+    row.addEventListener("dragend", () => row.classList.remove("dragging"));
+    row.addEventListener("dragover", (e) => { e.preventDefault(); row.classList.add("drag-over"); });
+    row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+    row.addEventListener("drop", (e) => {
+      e.preventDefault();
+      row.classList.remove("drag-over");
+      const toIndex = parseInt(row.dataset.idx, 10);
+      if (DRAG_FROM_INDEX !== null) moveMilestoneToIndex(DRAG_FROM_INDEX, toIndex);
+      DRAG_FROM_INDEX = null;
+    });
+  });
 }
 
 /* ============================================================

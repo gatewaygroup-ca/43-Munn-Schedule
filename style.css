@@ -475,3 +475,13 @@ body:not(.role-admin) .role-badge::before { content: "🔒 "; }
   .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
   .admin-panel-modal { max-width: 96vw; }
 }
+
+/* ---------- Admin milestone reorder list ---------- */
+.amr-drag-handle {
+  cursor: grab; color: var(--text-faint); font-size: 15px; padding: 0 2px; user-select: none; flex-shrink: 0;
+}
+.amr-num { color: var(--text-faint); font-weight: 700; font-size: 12px; flex-shrink: 0; width: 20px; text-align: right; }
+.admin-milestone-row.dragging { opacity: 0.4; }
+.admin-milestone-row.drag-over { border-color: var(--accent); background: var(--accent-soft); }
+.amr-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.amr-btn:disabled:hover { background: none; }

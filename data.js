@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS = {
   start: "2026-08-07",
   targetCompletion: "2027-04-07",
   status: "In Progress",
-  companyName: "Gateway Investment Group Inc.",
+  companyName: "Gateway Group",
   companyLogoDataUrl: null,
   subtitle: "Project milestone schedule & live tracker",
   projectManager: "",
@@ -72,7 +72,8 @@ const BASELINE_MILESTONES = [
   { id: 30, name: "Project Completion",                 duration: 1,  dependency: [29],       manualStart: null, status: "Not Started", progress: 0,  trade: "General Contractor",         priority: "Normal", notes: "Occupancy / handover." },
 ];
 
-BASELINE_MILESTONES.forEach((m) => {
+BASELINE_MILESTONES.forEach((m, i) => {
+  m.order = i + 1;
   m.description = m.description || "";
   m.contractPrice = 0;
   m.changeOrders = [];

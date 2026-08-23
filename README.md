@@ -238,16 +238,35 @@ talk to), not a secret — it grants no access by itself.
 
 ## 8. Managing milestones
 
-- **Add**: "+ Add Milestone" button above the Gantt (admin only)
-- **Duplicate / Delete / Reorder**: open any milestone → footer buttons
-  (Duplicate, Delete, ▲/▼). Deleting a milestone that other milestones
-  depend on shows a warning listing exactly which ones, and
-  automatically removes the dead dependency reference so the schedule
-  doesn't break.
-- **Edit everything else** (name via duplicate+rename, description,
-  duration, dependencies via CSV re-import, status, progress, priority,
-  trade, notes): from the milestone modal's Schedule tab
-- **Gallery**: the milestone modal's new Gallery tab
+- **Add**: Admin Panel → Milestones tab → "+ Add Milestone" (also available above the Gantt)
+- **Reorder**: Admin Panel → Milestones tab. Each row has ▲/▼ buttons — these
+  are the primary, always-available way to reorder (works identically on
+  desktop and mobile). You can also drag the `☰` handle to drop a
+  milestone into a new position. Both save to Firebase instantly, update
+  the Gantt/mobile list/upcoming milestones in the new order, and log an
+  activity entry like "Milestone order changed: Framing moved from #4 to
+  #2." **Reordering never changes dates, durations, or dependencies** —
+  those stay fully independent and are only affected if you edit them
+  directly. Milestone numbers shown everywhere are always derived live
+  from current position, never stored as fixed text.
+- **Duplicate / Delete**: open any milestone → footer buttons. Deleting a
+  milestone that others depend on shows a warning listing exactly which
+  ones, and safely removes the dead dependency reference so nothing
+  breaks.
+- **Edit everything else** (status, progress, priority, trade, notes,
+  description, duration, start-date override): milestone modal's
+  Schedule tab. Dependencies are edited via CSV re-import.
+- **Gallery**: the milestone modal's Gallery tab. Photos are tied to the
+  milestone's stable `id`, never to its position — reordering, like
+  everything else here, never disturbs gallery or financial data.
+
+### If you're upgrading an already-live site
+
+Existing milestones won't have an `order` field yet. The first time this
+version loads, it automatically assigns `order` based on each
+milestone's **current** position (exactly the sequence it's already
+displaying in) — nothing gets reshuffled, nothing is lost. This happens
+once, silently, the next time an admin is signed in when the page loads.
 
 ---
 
